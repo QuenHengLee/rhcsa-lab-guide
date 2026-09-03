@@ -56,6 +56,9 @@ lab finish  storage-lvm     # 清除該題建立的東西
 
 **建議流程**:先 `lab describe` 或 `lab start` 讀題、自己動手做,卡住再翻 `guide/rhcsa-guide.html`;做到 `lab grade` 全 PASS 才算過關。
 
+**循序規則 · Sequential rule**:上一題沒完成,不能開始下一題。某題 `lab start` 之後,必須 `lab grade` 全 PASS 或 `lab finish` 收掉,才能對別題 `lab start`;否則會被擋下。這逼你養成「做完、驗過、收乾淨」的紀律。緊急覆寫用 `LAB_FORCE=1 lab start <name>`(不建議)。
+You can't start the next exercise until the current one is finished — pass its grade or `lab finish` it first. Override with `LAB_FORCE=1` if you really must.
+
 ---
 
 ## 彩色提示字元(選用) · Colourful prompt (optional)

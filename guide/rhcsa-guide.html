@@ -99,6 +99,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
   <span class="step"><b>lab finish</b> 題目名 <span style="color:var(--muted)">清除還原</span></span>
 </div>
 <p class="sub" style="margin-top:6px"><code>lab grade</code> 可以重複執行,沒過就繼續改;<code>lab describe 題目名</code> 只看題目不動系統(中英雙語)。先看完題目、自己做過一輪,卡住再看本手冊的解法,效果最好。</p>
+<p class="note"><strong>循序規則:上一題沒完成,不能開始下一題。</strong>當某題已 <code>lab start</code> 但還沒「評分全 PASS」或 <code>lab finish</code>,再對「別題」下 <code>lab start</code> 會被擋下。要往下一題,先把手上這題 <code>lab grade</code> 到全綠、或 <code>lab finish</code> 收掉。(緊急覆寫:<code>LAB_FORCE=1 lab start 題名</code>,不建議。)這條規則逼你養成「做完、驗過、收乾淨」的節奏,正是考場該有的紀律。</p>
 <p class="note"><strong>本手冊的解題原則:最短能過關。</strong>所有解法都只保留「評分必要」的指令與選項,非必要的保險選項(如 <code>-xdev</code>、額外的 daemon-reload)一律省略——好記、好打、考場夠用。</p>
 
 <h2 style="margin-top:24px">目錄</h2>
