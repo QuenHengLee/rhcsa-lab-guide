@@ -44,6 +44,9 @@ Commands:
   grade <name>         Check your work and report what is still missing.
   finish <name>        Remove everything the exercise created.
 
+Rule: you must finish the current exercise (pass its grade, or 'lab finish'
+it) before you can start a new one.
+
 Examples:
   lab list
   lab start storage-lvm
@@ -121,6 +124,21 @@ banner() {
         "$name" "$LAB_TOPIC" "$LAB_NODE"
 }
 
+# Sequential-progress rule: you may not start a new exercise while a previous
+# one is still open. An exercise is "open" once 'lab start' has run and it has
+# neither been passed ('lab grade' with every check green) nor cleaned up
+# ('lab finish'). Prints the names of any open exercises other than $1.
+lab_open_exercises() {
+    local target=$1 f base
+    for f in "$LAB_STATE"/*.started; do
+        [ -e "$f" ] || continue
+        base=$(basename "$f" .started)
+        [ "$base" = "$target" ] && continue        # re-starting the same one is fine
+        [ -f "$LAB_STATE/$base.passed" ] && continue  # already passed = done
+        printf '%s\n' "$base"
+    done
+}
+
 cmd_describe() {
     banner "$1"
     lab_head "Task"
@@ -131,6 +149,26 @@ cmd_describe() {
 cmd_start() {
     local name=$1
     banner "$name"
+
+    # Enforce sequential progress: finish the current exercise before the next.
+    local open
+    open=$(lab_open_exercises "$name")
+    if [ -n "$open" ] && [ -z "${LAB_FORCE:-}" ]; then
+        lab_head "Blocked"
+        printf '  You still have an unfinished exercise:\n'
+        printf '    %s- %s%s\n' "$C_YEL" "$(printf '%s' "$open" | paste -sd, -)" "$C_0"
+        cat <<EOF
+
+  Finish it before starting a new one. Either:
+    * complete it   -> 'lab grade <name>' until every check is PASS, or
+    * clean it up   -> 'lab finish <name>'
+
+  (Override, not recommended:  LAB_FORCE=1 lab start $name)
+
+EOF
+        exit 1
+    fi
+
     lab_head "Preparing"
     if lab_setup; then
         printf '  environment ready.\n'
@@ -156,7 +194,13 @@ cmd_grade() {
     fi
     lab_head "Checking"
     lab_grade
-    lab_grade_summary
+    if lab_grade_summary; then
+        # All checks green: mark it passed so the next exercise is unlocked.
+        : > "$LAB_STATE/$name.passed"
+    else
+        # Regressed after a previous pass, or never passed: keep it locked.
+        rm -f "$LAB_STATE/$name.passed"
+    fi
 }
 
 cmd_finish() {
@@ -164,7 +208,7 @@ cmd_finish() {
     banner "$name"
     lab_head "Cleaning up"
     lab_finish
-    rm -f "$LAB_STATE/$name.started"
+    rm -f "$LAB_STATE/$name.started" "$LAB_STATE/$name.passed"
     printf '  done.\n\n'
 }
 
