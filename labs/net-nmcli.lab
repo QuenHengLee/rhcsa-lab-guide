@@ -1,0 +1,130 @@
+# shellcheck shell=bash
+# Source: RH124 ch.18.2 "Configure Networking from the Command Line" and
+# ch.18.6 "Configure Hostnames and Name Resolution"
+LAB_TITLE="Configure a static IPv4 address with nmcli"
+LAB_TOPIC="07 network-and-time"
+LAB_NODE="servera"
+
+LAB_DEV=enp0s9
+LAB_CON=labnet
+LAB_IP=172.25.250.10
+LAB_PREFIX=24
+LAB_DNS=172.25.250.254
+LAB_PEER_IP=172.25.250.11
+
+lab_describe() {
+    cat <<'EOF'
+  servera has a third network interface, enp0s9, attached to an isolated
+  lab network. It is currently unconfigured. The two interfaces you are
+  reading this over - enp0s3 and enp0s8 - must NOT be touched.
+
+  Using nmcli, create a connection profile on enp0s9 with:
+
+      connection name   labnet
+      addressing        static (manual), 172.25.250.10/24
+      DNS server        172.25.250.254
+      default route     NOT via this interface
+      autoconnect       yes, so it comes up at boot
+
+  Then make the name "labserver" resolve to 172.25.250.11 on this host
+  without using DNS.
+
+  Setting a default gateway on this interface would break your internet
+  access, which still has to go out through enp0s3 - that is why
+  ipv4.never-default matters here.
+
+  Verify with:  nmcli connection show labnet
+                ip -4 addr show enp0s9
+                ip route | head
+                getent hosts labserver
+
+  ----- 中文說明 -----
+
+  servera 有第三張網卡 enp0s9,接在一個隔離的實驗網路上,目前尚未
+  設定。你現在用來連線的兩張網卡——enp0s3 與 enp0s8——絕對不可以
+  更動。
+
+  使用 nmcli 在 enp0s9 上建立連線設定檔:
+
+      連線名稱      labnet
+      定址方式      靜態(manual),172.25.250.10/24
+      DNS 伺服器    172.25.250.254
+      預設路由      「不可」經由這張介面
+      autoconnect   yes,開機時自動啟用
+
+  接著,讓名稱「labserver」在這台主機上解析為 172.25.250.11,
+  但不透過 DNS。
+
+  如果在這張介面上設了預設閘道,你的網際網路連線會斷掉(它仍必須
+  走 enp0s3 出去)——這正是 ipv4.never-default 在這裡重要的原因。
+
+  驗證:nmcli connection show labnet
+        ip -4 addr show enp0s9
+        ip route | head
+        getent hosts labserver
+EOF
+}
+
+_field() { nmcli -g "$1" connection show "$LAB_CON" 2>/dev/null; }
+
+_con_exists()   { nmcli -t -f NAME connection show 2>/dev/null | grep -qx "$LAB_CON"; }
+_on_right_dev() { [ "$(_field connection.interface-name)" = "$LAB_DEV" ]; }
+_is_manual()    { [ "$(_field ipv4.method)" = manual ]; }
+_addr_ok()      { _field ipv4.addresses | grep -q "$LAB_IP/$LAB_PREFIX"; }
+_dns_ok()       { _field ipv4.dns | grep -q "$LAB_DNS"; }
+_never_default(){ [ "$(_field ipv4.never-default)" = yes ]; }
+_autoconnect()  { [ "$(_field connection.autoconnect)" = yes ]; }
+
+_live_addr() {
+    ip -4 -o addr show "$LAB_DEV" 2>/dev/null | grep -q "$LAB_IP/$LAB_PREFIX"
+}
+
+_default_route_intact() {
+    # The default route must still leave through the NAT interface.
+    ip route show default 2>/dev/null | grep -q 'dev enp0s3'
+}
+
+_hosts_entry() {
+    getent hosts labserver 2>/dev/null | grep -q "^$LAB_PEER_IP"
+}
+
+_other_nics_intact() {
+    ip -4 -o addr show enp0s3 2>/dev/null | grep -q 'inet ' &&
+    ip -4 -o addr show enp0s8 2>/dev/null | grep -q '192.168.56.'
+}
+
+lab_setup() {
+    local c
+    # Remove any profile bound to the lab interface, including the one
+    # NetworkManager creates on its own ("Wired connection N").
+    while read -r c; do
+        [ -n "$c" ] && nmcli connection delete "$c" >/dev/null 2>&1
+    done < <(nmcli -t -f NAME,DEVICE connection show 2>/dev/null |
+             awk -F: -v d="$LAB_DEV" '$2 == d { print $1 }')
+    nmcli connection delete "$LAB_CON" >/dev/null 2>&1
+    nmcli device disconnect "$LAB_DEV" >/dev/null 2>&1
+
+    sed -ri '/[[:space:]]labserver([[:space:]]|$)/d' /etc/hosts
+    return 0
+}
+
+lab_grade() {
+    grade_test "a connection profile named labnet exists"      _con_exists
+    grade_test "it is bound to enp0s9"                          _on_right_dev
+    grade_test "IPv4 addressing is manual, not DHCP"            _is_manual
+    grade_test "the address is 172.25.250.10/24"                _addr_ok
+    grade_test "the DNS server is 172.25.250.254"               _dns_ok
+    grade_test "it does not claim the default route"            _never_default
+    grade_test "it comes up automatically at boot"              _autoconnect
+    grade_test "enp0s9 really holds 172.25.250.10 right now"    _live_addr
+    grade_test "the default route still goes out through enp0s3" _default_route_intact
+    grade_test "enp0s3 and enp0s8 were left alone"              _other_nics_intact
+    grade_test "the name labserver resolves to 172.25.250.11"   _hosts_entry
+}
+
+lab_finish() {
+    nmcli connection delete "$LAB_CON" >/dev/null 2>&1
+    nmcli device disconnect "$LAB_DEV" >/dev/null 2>&1
+    sed -ri '/[[:space:]]labserver([[:space:]]|$)/d' /etc/hosts
+    return 0
+}

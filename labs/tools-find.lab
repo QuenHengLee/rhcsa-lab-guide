@@ -1,0 +1,84 @@
+# shellcheck shell=bash
+LAB_TITLE="Find files by owner and collect them"
+LAB_TOPIC="01 essential-tools"
+LAB_NODE="servera"
+
+LAB_FIND_USER=simone
+LAB_FIND_FILES=(
+    /home/simone/quarterly-notes.txt
+    /var/tmp/simone-report.txt
+    /opt/simone-data.log
+    /srv/simone-archive.txt
+    /usr/local/share/simone-handover.txt
+)
+# Same names, different owner: copying these too means the -user test was wrong.
+LAB_FIND_DECOYS=(
+    /var/tmp/root-report.txt
+    /opt/root-data.log
+)
+
+lab_describe() {
+    cat <<'EOF'
+  Every regular file on servera that is owned by the user "simone" must be
+  copied into the directory /root/found.
+
+    - Create /root/found if it does not exist.
+    - Copy the files themselves into it; do not recreate the directory tree.
+    - Files owned by anyone else must not end up there.
+
+  ----- 中文說明 -----
+
+  servera 上所有屬於使用者「simone」的一般檔案(regular file),都必須
+  複製到 /root/found 目錄。
+
+    - /root/found 不存在就先建立。
+    - 只複製檔案本身;不要重建原本的目錄樹。
+    - 其他使用者擁有的檔案不可以出現在裡面。
+EOF
+}
+
+lab_setup() {
+    local f
+    lab_user_del "$LAB_FIND_USER"
+    rm -rf /root/found
+    for f in "${LAB_FIND_FILES[@]}" "${LAB_FIND_DECOYS[@]}"; do rm -f "$f"; done
+
+    useradd -m "$LAB_FIND_USER" || return 1
+    for f in "${LAB_FIND_FILES[@]}"; do
+        install -d -m 755 "$(dirname "$f")"
+        echo "content of $(basename "$f")" > "$f"
+        chown "$LAB_FIND_USER:$LAB_FIND_USER" "$f"
+    done
+    for f in "${LAB_FIND_DECOYS[@]}"; do
+        install -d -m 755 "$(dirname "$f")"
+        echo "this one belongs to root" > "$f"
+        chown root:root "$f"
+    done
+    return 0
+}
+
+lab_grade() {
+    local f base
+    grade_check "/root/found exists and is a directory" \
+        '[ -d /root/found ]'
+
+    for f in "${LAB_FIND_FILES[@]}"; do
+        base=$(basename "$f")
+        grade_check "$base was collected into /root/found" \
+            "[ -f /root/found/$base ]"
+    done
+
+    for f in "${LAB_FIND_DECOYS[@]}"; do
+        base=$(basename "$f")
+        grade_check "$base (owned by root) was NOT collected" \
+            "[ ! -e /root/found/$base ]"
+    done
+}
+
+lab_finish() {
+    local f
+    rm -rf /root/found
+    for f in "${LAB_FIND_FILES[@]}" "${LAB_FIND_DECOYS[@]}"; do rm -f "$f"; done
+    lab_user_del "$LAB_FIND_USER"
+    return 0
+}

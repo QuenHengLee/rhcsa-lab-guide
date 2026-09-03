@@ -1,0 +1,94 @@
+# shellcheck shell=bash
+# Source: RH134 ch.14.2 "Manage a Server Firewall"
+LAB_TITLE="Open and close ports with firewalld"
+LAB_TOPIC="08 security"
+LAB_NODE="servera"
+
+LAB_ZONE=public
+
+lab_describe() {
+    cat <<'EOF'
+  Adjust the firewall on servera. Everything below applies to the public
+  zone, and every change must be PERMANENT as well as active right now -
+  a runtime-only change is lost at the next reload.
+
+    1. Allow the "http" service.
+
+    2. Allow TCP port 8080.
+
+    3. Remove the "cockpit" service, which is allowed by default and is
+       not wanted on this host.
+
+    4. Leave SSH allowed. If you lock yourself out you will have to work
+       from the VM console.
+
+  Check with:
+      firewall-cmd --list-all
+      firewall-cmd --permanent --list-all
+
+  ----- 中文說明 -----
+
+  調整 servera 的防火牆。以下全部針對 public zone,而且每一項變更
+  都必須「永久生效(PERMANENT)」同時「立即生效」——只改 runtime
+  的變更在下一次 reload 就會消失。
+
+    1. 允許「http」服務。
+
+    2. 允許 TCP 8080 連接埠。
+
+    3. 移除「cockpit」服務——它預設是允許的,但這台主機不需要。
+
+    4. SSH 保持允許。如果把自己鎖在門外,你就只能到 VM 的 console
+       去收拾了。
+
+  檢查:
+      firewall-cmd --list-all
+      firewall-cmd --permanent --list-all
+EOF
+}
+
+_perm_services() { firewall-cmd --permanent --zone="$LAB_ZONE" --list-services 2>/dev/null; }
+_perm_ports()    { firewall-cmd --permanent --zone="$LAB_ZONE" --list-ports    2>/dev/null; }
+_run_services()  { firewall-cmd --zone="$LAB_ZONE" --list-services 2>/dev/null; }
+_run_ports()     { firewall-cmd --zone="$LAB_ZONE" --list-ports    2>/dev/null; }
+
+_perm_has_http()     { _perm_services | tr ' ' '\n' | grep -qx http; }
+_perm_has_8080()     { _perm_ports    | tr ' ' '\n' | grep -qx 8080/tcp; }
+_perm_no_cockpit()   { ! _perm_services | tr ' ' '\n' | grep -qx cockpit; }
+_perm_keeps_ssh()    { _perm_services | tr ' ' '\n' | grep -qx ssh; }
+_runtime_matches()   {
+    _run_services | tr ' ' '\n' | grep -qx http || return 1
+    _run_ports    | tr ' ' '\n' | grep -qx 8080/tcp || return 1
+    ! _run_services | tr ' ' '\n' | grep -qx cockpit
+}
+
+lab_setup() {
+    lab_ensure_pkg firewalld
+    systemctl enable --now firewalld >/dev/null 2>&1
+    # Reset the zone to the starting state: ssh + cockpit allowed, nothing else.
+    firewall-cmd --permanent --zone="$LAB_ZONE" --remove-service=http  >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --remove-port=8080/tcp >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --add-service=cockpit  >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --add-service=ssh      >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "firewalld is enabled at boot" 'systemctl is-enabled --quiet firewalld'
+    grade_check "firewalld is running"         'systemctl is-active  --quiet firewalld'
+    grade_test "the http service is permanently allowed"  _perm_has_http
+    grade_test "port 8080/tcp is permanently allowed"     _perm_has_8080
+    grade_test "the cockpit service is permanently removed" _perm_no_cockpit
+    grade_test "ssh is still permanently allowed"         _perm_keeps_ssh
+    grade_test "the running firewall matches the permanent configuration" _runtime_matches
+}
+
+lab_finish() {
+    firewall-cmd --permanent --zone="$LAB_ZONE" --remove-service=http  >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --remove-port=8080/tcp >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --add-service=cockpit  >/dev/null 2>&1
+    firewall-cmd --permanent --zone="$LAB_ZONE" --add-service=ssh      >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+    return 0
+}

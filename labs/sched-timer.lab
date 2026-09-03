@@ -1,0 +1,113 @@
+# shellcheck shell=bash
+# Source: RH134 ch.4.2 "Manage Repeating Jobs by Using Systemd Timer Units"
+LAB_TITLE="Run a recurring job with a systemd timer unit"
+LAB_TOPIC="06 scheduling-and-services"
+LAB_NODE="servera"
+
+LAB_SCRIPT=/usr/local/bin/labreport.sh
+LAB_SVC=/etc/systemd/system/labreport.service
+LAB_TMR=/etc/systemd/system/labreport.timer
+
+lab_describe() {
+    cat <<'EOF'
+  The script /usr/local/bin/labreport.sh already exists and is
+  executable.
+
+  Arrange for systemd - not cron - to run it every 10 minutes:
+
+    1. Create a service unit /etc/systemd/system/labreport.service of
+       Type=oneshot that executes /usr/local/bin/labreport.sh
+
+    2. Create a timer unit /etc/systemd/system/labreport.timer that
+       triggers labreport.service every 10 minutes.
+
+    3. Enable and start the TIMER (not the service) so it also runs after
+       a reboot.
+
+  Check with "systemctl list-timers labreport.timer".
+
+  ----- 中文說明 -----
+
+  腳本 /usr/local/bin/labreport.sh 已存在且可執行。
+
+  讓 systemd(不是 cron)每 10 分鐘執行它一次:
+
+    1. 建立 service unit /etc/systemd/system/labreport.service,
+       Type=oneshot,執行 /usr/local/bin/labreport.sh
+
+    2. 建立 timer unit /etc/systemd/system/labreport.timer,
+       每 10 分鐘觸發一次 labreport.service。
+
+    3. enable 並 start 的對象是「TIMER」(不是 service),讓它在
+       重開機後也會執行。
+
+  用「systemctl list-timers labreport.timer」檢查。
+EOF
+}
+
+_svc_execs_script() {
+    systemctl cat labreport.service 2>/dev/null | grep -qE '^[[:space:]]*ExecStart=.*labreport\.sh'
+}
+
+_svc_oneshot() {
+    systemctl cat labreport.service 2>/dev/null | grep -qE '^[[:space:]]*Type=oneshot'
+}
+
+# Accept either the monotonic form or an equivalent calendar expression.
+_timer_every_10min() {
+    local u
+    u=$(systemctl cat labreport.timer 2>/dev/null) || return 1
+    printf '%s' "$u" | grep -qE '^[[:space:]]*OnUnitActiveSec=[[:space:]]*(10min|10m|600s|600)$' && return 0
+    printf '%s' "$u" | grep -qE '^[[:space:]]*OnCalendar=.*\*:0?0?/10' && return 0
+    return 1
+}
+
+_timer_listed() {
+    SYSTEMD_COLUMNS=200 systemctl list-timers --all --no-pager --no-legend 2>/dev/null \
+        | grep -q 'labreport.timer'
+}
+
+# A unit with no [Install] section reports "static" and exits 0, so
+# `! systemctl is-enabled` would be wrong here - compare the word instead.
+_svc_not_enabled() {
+    [ "$(systemctl is-enabled labreport.service 2>/dev/null)" != enabled ]
+}
+
+lab_setup() {
+    systemctl disable --now labreport.timer >/dev/null 2>&1
+    systemctl disable --now labreport.service >/dev/null 2>&1
+    rm -f "$LAB_SVC" "$LAB_TMR"
+    systemctl daemon-reload >/dev/null 2>&1
+
+    cat > "$LAB_SCRIPT" <<'EOF'
+#!/bin/bash
+# Placeholder workload for the systemd timer exercise.
+/usr/bin/logger "labreport ran at $(date -Is)"
+EOF
+    chmod 755 "$LAB_SCRIPT"
+    return 0
+}
+
+lab_grade() {
+    grade_check "the service unit file exists" \
+        '[ -f /etc/systemd/system/labreport.service ]'
+    grade_test "the service is Type=oneshot" _svc_oneshot
+    grade_test "the service executes /usr/local/bin/labreport.sh" _svc_execs_script
+    grade_check "the timer unit file exists" \
+        '[ -f /etc/systemd/system/labreport.timer ]'
+    grade_test "the timer fires every 10 minutes" _timer_every_10min
+    grade_check "the timer is enabled at boot" \
+        'systemctl is-enabled --quiet labreport.timer'
+    grade_check "the timer is active now" \
+        'systemctl is-active --quiet labreport.timer'
+    grade_test "systemd lists it among the active timers" _timer_listed
+    grade_test "the service itself is NOT enabled (the timer drives it)" _svc_not_enabled
+}
+
+lab_finish() {
+    systemctl disable --now labreport.timer >/dev/null 2>&1
+    systemctl disable --now labreport.service >/dev/null 2>&1
+    rm -f "$LAB_SVC" "$LAB_TMR" "$LAB_SCRIPT"
+    systemctl daemon-reload >/dev/null 2>&1
+    return 0
+}

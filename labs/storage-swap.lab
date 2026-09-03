@@ -1,0 +1,126 @@
+# shellcheck shell=bash
+LAB_TITLE="Add a swap partition and enable it at boot"
+LAB_TOPIC="04 storage"
+LAB_NODE="servera"
+
+lab_describe() {
+    cat <<'EOF'
+  The disk /dev/nvme0n2 is blank and reserved for practice.
+
+    1. Create a 512 MiB partition on /dev/nvme0n2 and mark it as a swap
+       partition.
+
+    2. Format it as swap and activate it immediately - "swapon --show"
+       must list it.
+
+    3. Make it activate automatically at every boot.
+
+  The existing swap on the system disk must stay untouched.
+
+  ----- 中文說明 -----
+
+  磁碟 /dev/nvme0n2 是空白的練習碟。
+
+    1. 在 /dev/nvme0n2 建立一個 512 MiB 的分割區,並把分割區類型
+       標記為 swap。
+
+    2. 將它格式化為 swap 並立即啟用——「swapon --show」必須列得出
+       它。
+
+    3. 讓它在每次開機時自動啟用。
+
+  系統碟上原有的 swap 必須保持原狀,不可以動。
+EOF
+}
+
+_partdev() {
+    local p
+    p=$(lsblk -nro NAME "$LAB_DISK2" 2>/dev/null | tail -n +2 | head -1)
+    [ -n "$p" ] || return 1
+    printf '/dev/%s\n' "$p"
+}
+
+_size_ok() {
+    local d b
+    d=$(_partdev) || return 1
+    b=$(lsblk -nbdo SIZE "$d" 2>/dev/null) || return 1
+    # 512 MiB with alignment slack.
+    [ "$b" -ge 503316480 ] && [ "$b" -le 587202560 ]
+}
+
+_is_swap() {
+    local d
+    d=$(_partdev) || return 1
+    [ "$(blkid -s TYPE -o value "$d" 2>/dev/null)" = swap ]
+}
+
+_swap_active() {
+    local d
+    d=$(_partdev) || return 1
+    swapon --noheadings --show=NAME 2>/dev/null | grep -qx "$d"
+}
+
+_fstab_swap() {
+    local d uuid spec
+    d=$(_partdev) || return 1
+    uuid=$(blkid -s UUID -o value "$d" 2>/dev/null)
+    while read -r spec; do
+        case "$spec" in
+            UUID=*) [ -n "$uuid" ] && [ "${spec#UUID=}" = "$uuid" ] && return 0 ;;
+            /dev/*) [ "$spec" = "$d" ] && return 0 ;;
+        esac
+    done < <(awk '!/^[[:space:]]*#/ && $3 == "swap" { print $1 }' /etc/fstab)
+    return 1
+}
+
+_root_swap_intact() {
+    # swapon reports the resolved device (/dev/dm-1), not the friendly
+    # /dev/mapper/rl-swap name, so compare resolved paths.
+    local want name
+    want=$(realpath /dev/mapper/rl-swap 2>/dev/null) || return 1
+    while read -r name; do
+        [ "$(realpath "$name" 2>/dev/null)" = "$want" ] && return 0
+    done < <(swapon --noheadings --show=NAME 2>/dev/null)
+    return 1
+}
+
+# Strip every swap entry except the system one. A stale UUID= line left
+# behind by a previous attempt would otherwise fail at the next boot.
+_clean_swap_fstab() {
+    local tmp
+    tmp=$(mktemp /etc/fstab.lab.XXXXXX) || return 1
+    awk '
+        /^[[:space:]]*#/                 { print; next }
+        NF == 0                          { print; next }
+        $3 == "swap" && $1 !~ /rl-swap/  { next }
+                                         { print }
+    ' /etc/fstab > "$tmp" && cat "$tmp" > /etc/fstab
+    rm -f "$tmp"
+    systemctl daemon-reload 2>/dev/null
+    return 0
+}
+
+lab_setup() {
+    lab_wipe_disk "$LAB_DISK2"
+    _clean_swap_fstab
+    return 0
+}
+
+lab_grade() {
+    grade_test "a partition exists on /dev/nvme0n2" _partdev
+    grade_test "the partition is 512 MiB" _size_ok
+    grade_test "it is formatted as swap" _is_swap
+    grade_test "the swap area is active now" _swap_active
+    grade_test "/etc/fstab activates it at boot" _fstab_swap
+    grade_test "the original system swap is still active" _root_swap_intact
+    grade_check "the fstab file is free of errors" \
+        'findmnt --verify --verbose >/dev/null'
+}
+
+lab_finish() {
+    local d
+    d=$(_partdev) && swapoff "$d" 2>/dev/null
+    _clean_swap_fstab
+    lab_wipe_disk "$LAB_DISK2"
+    return 0
+}

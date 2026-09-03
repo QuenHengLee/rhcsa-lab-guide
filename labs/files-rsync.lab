@@ -1,0 +1,134 @@
+# shellcheck shell=bash
+# Source: RH134 ch.8.4 "Synchronize Content Between Systems"
+LAB_TITLE="Mirror a directory to serverb with rsync"
+LAB_TOPIC="05 network-filesystems"
+LAB_NODE="servera"
+
+LAB_PEER=serverb
+LAB_SRC=/opt/labdata
+LAB_DST=/opt/labdata-backup
+
+lab_describe() {
+    cat <<'EOF'
+  The directory /opt/labdata on servera holds several files with a
+  deliberate mix of owners, permissions and timestamps.
+
+  serverb already has /opt/labdata-backup, but its contents are out of
+  date: it holds a file called obsolete.txt that no longer exists on
+  servera.
+
+  Using rsync over SSH, make serverb:/opt/labdata-backup an exact mirror
+  of servera:/opt/labdata, such that:
+
+    - every file from the source is present on serverb;
+    - permissions, ownership and modification times are preserved;
+    - obsolete.txt is deleted from serverb, because it is not in the
+      source any more.
+
+  Mind the trailing slash on the source path - it decides whether you copy
+  the directory itself or its contents.
+
+  ----- 中文說明 -----
+
+  servera 上的 /opt/labdata 目錄放了數個檔案,擁有者、權限與時間
+  戳記刻意各不相同。
+
+  serverb 上已有 /opt/labdata-backup,但內容過時:裡面有一個
+  servera 上已經不存在的檔案 obsolete.txt。
+
+  使用 rsync 走 SSH,讓 serverb:/opt/labdata-backup 成為
+  servera:/opt/labdata 的「精確鏡像」,做到:
+
+    - 來源的每一個檔案都存在於 serverb;
+    - 權限、擁有者與修改時間都被保留;
+    - obsolete.txt 因為來源已無此檔,必須從 serverb 上刪除。
+
+  注意來源路徑結尾的斜線——它決定你複製的是目錄本身,還是目錄的
+  內容。
+EOF
+}
+
+_peer_ls()  { lab_on_peer "$LAB_PEER" "cd $LAB_DST 2>/dev/null && ls -1 | sort"; }
+_local_ls() { (cd "$LAB_SRC" && ls -1 | sort); }
+
+_same_filelist() { [ "$(_peer_ls)" = "$(_local_ls)" ]; }
+
+_obsolete_gone() {
+    ! lab_on_peer "$LAB_PEER" "test -e $LAB_DST/obsolete.txt"
+}
+
+_same_checksums() {
+    local a b
+    a=$( cd "$LAB_SRC" && find . -type f -exec sha256sum {} + | sort -k2 )
+    b=$( lab_on_peer "$LAB_PEER" "cd $LAB_DST && find . -type f -exec sha256sum {} + | sort -k2" )
+    [ -n "$a" ] && [ "$a" = "$b" ]
+}
+
+_same_modes() {
+    local a b
+    a=$( cd "$LAB_SRC" && find . -type f -printf '%m %p\n' | sort -k2 )
+    b=$( lab_on_peer "$LAB_PEER" "cd $LAB_DST && find . -type f -printf '%m %p\n' | sort -k2" )
+    [ -n "$a" ] && [ "$a" = "$b" ]
+}
+
+_same_owners() {
+    local a b
+    a=$( cd "$LAB_SRC" && find . -type f -printf '%u:%g %p\n' | sort -k2 )
+    b=$( lab_on_peer "$LAB_PEER" "cd $LAB_DST && find . -type f -printf '%u:%g %p\n' | sort -k2" )
+    [ -n "$a" ] && [ "$a" = "$b" ]
+}
+
+_same_mtimes() {
+    local a b
+    a=$( cd "$LAB_SRC" && find . -type f -printf '%T@ %p\n' | sort -k2 | cut -d. -f1,3- )
+    b=$( lab_on_peer "$LAB_PEER" "cd $LAB_DST && find . -type f -printf '%T@ %p\n' | sort -k2 | cut -d. -f1,3-" )
+    [ -n "$a" ] && [ "$a" = "$b" ]
+}
+
+lab_setup() {
+    lab_ensure_pkg rsync
+    if ! lab_peer_reachable "$LAB_PEER"; then
+        lab_warn "$LAB_PEER is not reachable - start it before running this exercise."
+        return 1
+    fi
+
+    rm -rf "$LAB_SRC"
+    install -d -m 755 "$LAB_SRC"
+    id labowner >/dev/null 2>&1 || useradd -m labowner
+
+    echo "quarterly figures"      > "$LAB_SRC/report.txt";  chmod 640 "$LAB_SRC/report.txt"
+    echo "deployment notes"       > "$LAB_SRC/notes.txt";   chmod 600 "$LAB_SRC/notes.txt"
+    echo "#!/bin/bash"            > "$LAB_SRC/run.sh";      chmod 755 "$LAB_SRC/run.sh"
+    install -d -m 750 "$LAB_SRC/archive"
+    echo "older material"         > "$LAB_SRC/archive/old.txt"; chmod 644 "$LAB_SRC/archive/old.txt"
+    chown labowner:labowner "$LAB_SRC/notes.txt" "$LAB_SRC/archive/old.txt"
+    touch -d '2025-03-04 11:22:33' "$LAB_SRC"/*.txt "$LAB_SRC"/run.sh "$LAB_SRC/archive/old.txt"
+
+    lab_on_peer "$LAB_PEER" "
+        id labowner >/dev/null 2>&1 || useradd -m labowner
+        rm -rf $LAB_DST
+        install -d -m 755 $LAB_DST
+        echo 'this file must be deleted by your sync' > $LAB_DST/obsolete.txt
+        rpm -q rsync >/dev/null 2>&1 || dnf -y -q install rsync >/dev/null 2>&1
+    " >/dev/null 2>&1 || { lab_warn "could not prepare $LAB_PEER"; return 1; }
+    return 0
+}
+
+lab_grade() {
+    grade_check "serverb is reachable" 'ping -c1 -W3 serverb'
+    grade_test "the file list on serverb matches servera" _same_filelist
+    grade_test "obsolete.txt was deleted from serverb"    _obsolete_gone
+    grade_test "file contents match"                      _same_checksums
+    grade_test "permissions were preserved"               _same_modes
+    grade_test "ownership was preserved"                  _same_owners
+    grade_test "modification times were preserved"        _same_mtimes
+}
+
+lab_finish() {
+    rm -rf "$LAB_SRC"
+    if lab_peer_reachable "$LAB_PEER"; then
+        lab_on_peer "$LAB_PEER" "rm -rf $LAB_DST; userdel -r labowner 2>/dev/null" >/dev/null 2>&1
+    fi
+    lab_user_del labowner
+    return 0
+}

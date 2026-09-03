@@ -1,0 +1,128 @@
+# shellcheck shell=bash
+LAB_TITLE="Serve a web page on a non-standard port with SELinux enforcing"
+LAB_TOPIC="08 security"
+LAB_NODE="servera"
+
+LAB_PORT=82
+LAB_ROOT=/web
+LAB_PAGE=/web/index.html
+LAB_TEXT="Welcome to servera"
+
+lab_describe() {
+    cat <<'EOF'
+  Publish a web page on servera under these conditions:
+
+    1. Install and enable httpd so it also starts after a reboot.
+
+    2. The document root is /web, and /web/index.html contains exactly
+       the line
+
+           Welcome to servera
+
+    3. httpd listens on TCP port 82 instead of 80.
+
+    4. SELinux stays in enforcing mode. That means both the files and the
+       port need the right labels - do not disable SELinux, and do not
+       use "setenforce 0".
+
+    5. The firewall allows incoming connections on port 82.
+
+  "curl http://servera:82" must return the page. Remember that
+  DocumentRoot /web also needs an Apache <Directory> block granting
+  access, otherwise you will get 403 Forbidden.
+
+  ----- 中文說明 -----
+
+  在 servera 上發佈一個網頁,條件如下:
+
+    1. 安裝並 enable httpd,讓它重開機後也會啟動。
+
+    2. document root 是 /web,且 /web/index.html 的內容必須恰好是
+       這一行:
+
+           Welcome to servera
+
+    3. httpd 監聽 TCP 82 連接埠,而不是 80。
+
+    4. SELinux 保持 enforcing。這代表檔案和連接埠都需要正確的
+       SELinux 標籤——不可以停用 SELinux,也不可以用
+       「setenforce 0」。
+
+    5. 防火牆允許 82 連接埠的進入連線。
+
+  「curl http://servera:82」必須回傳該頁面。記得 DocumentRoot /web
+  還需要一個 Apache 的 <Directory> 區塊授權存取,否則你會得到
+  403 Forbidden。
+EOF
+}
+
+_page_context() {
+    ls -Z "$LAB_PAGE" 2>/dev/null | grep -q 'httpd_sys_content_t'
+}
+
+_port_labelled() {
+    semanage port -l 2>/dev/null | awk '/^http_port_t/ { print }' | grep -qw "$LAB_PORT"
+}
+
+_firewall_open() {
+    firewall-cmd --permanent --list-ports 2>/dev/null | grep -qw "${LAB_PORT}/tcp" ||
+    firewall-cmd --permanent --list-services 2>/dev/null | grep -qw "http-alt"
+}
+
+_serves_page() {
+    curl -s --max-time 10 "http://localhost:${LAB_PORT}/" 2>/dev/null | grep -qx "$LAB_TEXT"
+}
+
+lab_setup() {
+    lab_ensure_pkg policycoreutils-python-utils firewalld curl
+
+    systemctl disable --now httpd >/dev/null 2>&1
+    rm -rf "$LAB_ROOT"
+
+    if [ -f /etc/httpd/conf/httpd.conf ]; then
+        sed -ri 's/^[[:space:]]*Listen[[:space:]]+[0-9]+.*/Listen 80/' /etc/httpd/conf/httpd.conf
+        sed -ri 's#^[[:space:]]*DocumentRoot[[:space:]]+.*#DocumentRoot "/var/www/html"#' /etc/httpd/conf/httpd.conf
+        rm -f /etc/httpd/conf.d/lab*.conf
+    fi
+
+    semanage port -d -t http_port_t -p tcp "$LAB_PORT" >/dev/null 2>&1
+    systemctl enable --now firewalld >/dev/null 2>&1
+    firewall-cmd --permanent --remove-port="${LAB_PORT}/tcp" >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+
+    setenforce 1 >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "SELinux is in enforcing mode" \
+        '[ "$(getenforce)" = Enforcing ]'
+    grade_check "httpd is installed" \
+        'rpm -q httpd'
+    grade_check "httpd is enabled at boot" \
+        'systemctl is-enabled --quiet httpd'
+    grade_check "httpd is running" \
+        'systemctl is-active --quiet httpd'
+    grade_check "/web/index.html exists with the required content" \
+        'grep -qx "Welcome to servera" /web/index.html'
+    grade_test "the page carries the httpd_sys_content_t SELinux label" _page_context
+    grade_check "httpd is listening on port 82" \
+        'ss -ltnH "sport = :82" | grep -q .'
+    grade_test "port 82 is labelled http_port_t for SELinux" _port_labelled
+    grade_test "the firewall permanently allows port 82" _firewall_open
+    grade_test "the page is actually served on port 82" _serves_page
+}
+
+lab_finish() {
+    systemctl disable --now httpd >/dev/null 2>&1
+    rm -rf "$LAB_ROOT"
+    rm -f /etc/httpd/conf.d/lab*.conf
+    if [ -f /etc/httpd/conf/httpd.conf ]; then
+        sed -ri 's/^[[:space:]]*Listen[[:space:]]+[0-9]+.*/Listen 80/' /etc/httpd/conf/httpd.conf
+        sed -ri 's#^[[:space:]]*DocumentRoot[[:space:]]+.*#DocumentRoot "/var/www/html"#' /etc/httpd/conf/httpd.conf
+    fi
+    semanage port -d -t http_port_t -p tcp "$LAB_PORT" >/dev/null 2>&1
+    firewall-cmd --permanent --remove-port="${LAB_PORT}/tcp" >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+    return 0
+}

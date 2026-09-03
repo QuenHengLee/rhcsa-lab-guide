@@ -1,0 +1,104 @@
+# shellcheck shell=bash
+LAB_TITLE="Stratis pool, filesystem and snapshot"
+LAB_TOPIC="04 storage"
+LAB_NODE="servera"
+
+LAB_POOL=stratispool
+LAB_FS=stratisfs
+LAB_SNAP=stratissnap
+LAB_TARGET=/stratisvolume
+
+lab_describe() {
+    cat <<'EOF'
+  The disk /dev/nvme0n1 is blank and reserved for practice. The stratisd
+  service and the stratis command are already installed.
+
+    1. Create a Stratis pool called "stratispool" using /dev/nvme0n1.
+
+    2. Create a Stratis filesystem called "stratisfs" in that pool.
+
+    3. Mount it persistently at /stratisvolume. A Stratis filesystem is
+       not ready at the moment fstab is normally processed, so the entry
+       needs the mount option
+
+           x-systemd.requires=stratisd.service
+
+       alongside the usual defaults.
+
+    4. Take a snapshot of stratisfs and call it "stratissnap".
+
+  ----- 中文說明 -----
+
+  磁碟 /dev/nvme0n1 是空白的練習碟。stratisd 服務與 stratis 指令都
+  已經安裝好。
+
+    1. 用 /dev/nvme0n1 建立名為「stratispool」的 Stratis pool。
+
+    2. 在該 pool 中建立名為「stratisfs」的 Stratis 檔案系統。
+
+    3. 持久掛載在 /stratisvolume。Stratis 檔案系統在 fstab 一般被
+       處理的時間點還沒就緒,所以除了普通的 defaults 之外,掛載
+       選項還需要
+
+           x-systemd.requires=stratisd.service
+
+    4. 為 stratisfs 建立一個名為「stratissnap」的 snapshot。
+EOF
+}
+
+_pool_exists() { stratis pool list 2>/dev/null | grep -qw "$LAB_POOL"; }
+_fs_exists()   { stratis filesystem list 2>/dev/null | grep -qw "$LAB_FS"; }
+_snap_exists() { stratis filesystem list 2>/dev/null | grep -qw "$LAB_SNAP"; }
+
+_mounted_here() {
+    local src
+    src=$(findmnt -nro SOURCE --mountpoint "$LAB_TARGET" 2>/dev/null) || return 1
+    printf '%s' "$src" | grep -q "stratis"
+}
+
+_fstab_ok() {
+    awk -v m="$LAB_TARGET" '
+        !/^[[:space:]]*#/ && $2 == m && $4 ~ /x-systemd\.requires=stratisd\.service/ { found = 1 }
+        END { exit !found }
+    ' /etc/fstab
+}
+
+_teardown() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    local f
+    for f in $(stratis filesystem list "$LAB_POOL" 2>/dev/null | awk 'NR>1 {print $2}'); do
+        stratis filesystem destroy "$LAB_POOL" "$f" >/dev/null 2>&1
+    done
+    stratis pool destroy "$LAB_POOL" >/dev/null 2>&1
+    rm -rf "$LAB_TARGET"
+    return 0
+}
+
+lab_setup() {
+    lab_ensure_pkg stratisd stratis-cli
+    systemctl enable --now stratisd >/dev/null 2>&1
+    _teardown
+    lab_wipe_disk "$LAB_DISK1"
+    return 0
+}
+
+lab_grade() {
+    grade_check "stratisd is running" \
+        'systemctl is-active --quiet stratisd'
+    grade_test "the pool stratispool exists" _pool_exists
+    grade_check "the pool is built on /dev/nvme0n1" \
+        'stratis pool list --name stratispool 2>/dev/null | grep -q nvme0n1 || stratis blockdev list stratispool 2>/dev/null | grep -q nvme0n1'
+    grade_test "the filesystem stratisfs exists" _fs_exists
+    grade_test "it is mounted at /stratisvolume right now" _mounted_here
+    grade_test "/etc/fstab mounts it with x-systemd.requires=stratisd.service" _fstab_ok
+    grade_test "the snapshot stratissnap exists" _snap_exists
+    grade_check "the fstab file is free of errors" \
+        'findmnt --verify --verbose >/dev/null'
+}
+
+lab_finish() {
+    _teardown
+    lab_wipe_disk "$LAB_DISK1"
+    return 0
+}

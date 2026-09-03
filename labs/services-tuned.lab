@@ -1,0 +1,51 @@
+# shellcheck shell=bash
+LAB_TITLE="Select a tuning profile with tuned"
+LAB_TOPIC="06 scheduling-and-services"
+LAB_NODE="servera"
+
+LAB_WANT=virtual-guest
+
+lab_describe() {
+    cat <<'EOF'
+  Make sure the tuned service is installed, running, and starts at boot.
+
+  Then make "virtual-guest" the active tuning profile.
+
+  Confirm with "tuned-adm active" before grading.
+
+  ----- 中文說明 -----
+
+  確認 tuned 服務已安裝、正在執行,而且開機會自動啟動。
+
+  然後把「virtual-guest」設為使用中的調校 profile。
+
+  評分之前先用「tuned-adm active」確認。
+EOF
+}
+
+_profile_active() {
+    tuned-adm active 2>/dev/null | grep -q "Current active profile: *$LAB_WANT"
+}
+
+lab_setup() {
+    lab_ensure_pkg tuned
+    systemctl enable --now tuned >/dev/null 2>&1
+    # Park it on something else so the exercise has work to do.
+    tuned-adm profile balanced >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "tuned is installed" \
+        'rpm -q tuned'
+    grade_check "tuned is enabled at boot" \
+        'systemctl is-enabled --quiet tuned'
+    grade_check "tuned is running" \
+        'systemctl is-active --quiet tuned'
+    grade_test "the active profile is virtual-guest" _profile_active
+}
+
+lab_finish() {
+    tuned-adm auto_profile >/dev/null 2>&1
+    return 0
+}

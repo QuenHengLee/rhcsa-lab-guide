@@ -1,0 +1,117 @@
+# shellcheck shell=bash
+# Source: RH124 ch.19.4 "Configure SSH Key-based Authentication"
+LAB_TITLE="Set up SSH key-based authentication to serverb"
+LAB_TOPIC="08 security"
+LAB_NODE="servera"
+
+LAB_PEER=serverb
+LAB_U=student
+
+lab_describe() {
+    cat <<'EOF'
+  As the student user on servera, arrange to log in to student@serverb
+  without typing a password.
+
+    1. Generate an SSH key pair for student on servera. It must have an
+       EMPTY passphrase, so that the login is fully non-interactive.
+
+    2. Install the public key into student's authorized_keys on serverb.
+       (student's password on serverb is "student".)
+
+    3. Confirm it works:
+
+           ssh student@serverb hostname
+
+       must return serverb.lab.example.com without prompting.
+
+  Do the work as student, not as root. Note that /home/student/.ssh must
+  be mode 700 and authorized_keys mode 600, or sshd will ignore them.
+
+  ----- 中文說明 -----
+
+  以 servera 上的 student 使用者身分,做到登入 student@serverb 時
+  不需要輸入密碼。
+
+    1. 在 servera 為 student 產生一組 SSH 金鑰對。passphrase 必須是
+       「空的」,登入才能完全非互動。
+
+    2. 把公鑰安裝到 serverb 上 student 的 authorized_keys。
+       (serverb 上 student 的密碼是 "student"。)
+
+    3. 確認可用:
+
+           ssh student@serverb hostname
+
+       必須在不提示輸入任何東西的情況下回傳 serverb.lab.example.com。
+
+  請以 student 身分操作,不是 root。注意 /home/student/.ssh 必須是
+  700、authorized_keys 必須是 600,否則 sshd 會忽略它們。
+EOF
+}
+
+_home() { getent passwd "$LAB_U" | cut -d: -f6; }
+
+_key_exists() {
+    local h; h=$(_home)
+    ls "$h"/.ssh/id_* >/dev/null 2>&1
+}
+
+_key_no_passphrase() {
+    local h k; h=$(_home)
+    for k in "$h"/.ssh/id_rsa "$h"/.ssh/id_ecdsa "$h"/.ssh/id_ed25519; do
+        [ -f "$k" ] || continue
+        runuser -l "$LAB_U" -c "ssh-keygen -y -P '' -f $k" >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+
+_login_works() {
+    local out
+    out=$(runuser -l "$LAB_U" -c \
+        "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 $LAB_PEER hostname" 2>/dev/null)
+    printf '%s' "$out" | grep -q "^${LAB_PEER}"
+}
+
+_perms_ok() {
+    local h; h=$(_home)
+    [ "$(stat -c %a "$h/.ssh" 2>/dev/null)" = 700 ]
+}
+
+# Strip only keys this exercise would have added; leave any other authorised
+# key on serverb (including the one the host workstation uses) alone.
+_clean_peer() {
+    lab_on_peer "$LAB_PEER" "
+        h=\$(getent passwd $LAB_U | cut -d: -f6)
+        f=\$h/.ssh/authorized_keys
+        [ -f \"\$f\" ] || exit 0
+        grep -v '$LAB_U@servera' \"\$f\" > \"\$f.lab\" && mv -f \"\$f.lab\" \"\$f\"
+        chown $LAB_U: \"\$f\"; chmod 600 \"\$f\"
+    " >/dev/null 2>&1
+    return 0
+}
+
+lab_setup() {
+    if ! lab_peer_reachable "$LAB_PEER"; then
+        lab_warn "$LAB_PEER is not reachable - start it before running this exercise."
+        return 1
+    fi
+    local h; h=$(_home)
+    rm -f "$h"/.ssh/id_* 2>/dev/null
+    _clean_peer
+    return 0
+}
+
+lab_grade() {
+    grade_check "serverb is reachable" 'ping -c1 -W3 serverb'
+    grade_test "student has an SSH key pair on servera" _key_exists
+    grade_test "the private key has an empty passphrase" _key_no_passphrase
+    grade_test "/home/student/.ssh is mode 700" _perms_ok
+    grade_test "student can ssh to serverb with no password prompt" _login_works
+}
+
+lab_finish() {
+    local h; h=$(_home)
+    rm -f "$h"/.ssh/id_* 2>/dev/null
+    lab_peer_reachable "$LAB_PEER" && _clean_peer
+    return 0
+}

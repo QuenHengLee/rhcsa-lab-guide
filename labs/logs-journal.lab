@@ -1,0 +1,135 @@
+# shellcheck shell=bash
+# Source: RH134 ch.5.8 "Configure a Persistent System Journal"
+LAB_TITLE="Make the systemd journal survive reboots"
+LAB_TOPIC="11 processes-and-logs"
+LAB_NODE="servera"
+
+LAB_JDIR=/var/log/journal
+LAB_CONF=/etc/systemd/journald.conf
+
+# Rocky 10 ships no /etc/systemd/journald.conf at all - the packaged defaults
+# live in /usr/lib/systemd/journald.conf. So the pristine state is "no file",
+# and that is what both setup and finish restore. Creating a file here with a
+# stray assignment above the [Journal] header is silently ignored by systemd
+# and makes the exercise unsolvable in a way that is very hard to spot.
+_reset_journald_conf() {
+    rm -f "$LAB_CONF"
+    rm -f /etc/systemd/journald.conf.d/*.conf 2>/dev/null
+    return 0
+}
+
+lab_describe() {
+    cat <<'EOF'
+  Right now this system keeps its journal in memory only - everything
+  logged is lost at reboot. Confirm that for yourself with
+
+      journalctl --header | grep 'File path'
+
+  Change it so that:
+
+    1. The journal is stored persistently under /var/log/journal and
+       journald is actually writing there now (not just configured to).
+
+    2. The journal never grows beyond 100 MB of disk.
+
+  Both settings must survive a reboot. After you are done,
+  "journalctl --list-boots" will start accumulating boot records.
+
+  Note that this system has no /etc/systemd/journald.conf yet - the
+  packaged defaults live in /usr/lib/systemd/journald.conf. Create the
+  /etc file yourself, or add a drop-in under
+  /etc/systemd/journald.conf.d/. Either is accepted. If you create the
+  /etc file from scratch, remember it needs a [Journal] section header:
+  an assignment above it is silently ignored.
+
+  Watch out: creating /var/log/journal with a plain mkdir is not enough.
+  journald will keep logging to memory unless the directory has the right
+  owner and mode. Either let systemd build it for you with
+
+      systemd-tmpfiles --create --prefix /var/log/journal
+
+  or set root:systemd-journal and mode 2755 yourself.
+
+  Then tell journald to move over - "journalctl --flush" does it
+  immediately, and so does a reboot.
+
+  ----- 中文說明 -----
+
+  目前這台系統的 journal 只存放在記憶體中——所有日誌在重開機後就
+  消失。你可以自己確認:
+
+      journalctl --header | grep 'File path'
+
+  請改成:
+
+    1. journal 持久儲存在 /var/log/journal 之下,而且 journald
+       「現在就」實際寫到那裡(不能只是設定好而已)。
+
+    2. journal 的磁碟用量永遠不超過 100 MB。
+
+  兩項設定都必須在重開機後仍然有效。完成後
+  「journalctl --list-boots」會開始累積開機紀錄。
+
+  注意:這台系統還沒有 /etc/systemd/journald.conf——套件的預設值
+  放在 /usr/lib/systemd/journald.conf。你可以自己建立 /etc 下的
+  檔案,或是在 /etc/systemd/journald.conf.d/ 底下放 drop-in,兩種
+  都接受。若從零建立 /etc 檔,記得需要 [Journal] 區段標頭:寫在
+  標頭之前的設定會被靜默忽略。
+
+  小心:只用 mkdir 建立 /var/log/journal 是不夠的。除非目錄有正確
+  的擁有者與權限,journald 仍會繼續寫到記憶體。可以讓 systemd 幫
+  你建好:
+
+      systemd-tmpfiles --create --prefix /var/log/journal
+
+  或自己設成 root:systemd-journal、權限 2755。
+
+  然後叫 journald 搬過去——「journalctl --flush」立即生效,重開機
+  也可以。
+EOF
+}
+
+_journal_dir_live() {
+    [ -d "$LAB_JDIR" ] || return 1
+    # journald creates a machine-id subdirectory holding *.journal files.
+    find "$LAB_JDIR" -maxdepth 2 -name '*.journal' -print -quit 2>/dev/null | grep -q .
+}
+
+_storage_persistent() {
+    grep -rhqE '^[[:space:]]*Storage[[:space:]]*=[[:space:]]*persistent' \
+        "$LAB_CONF" /etc/systemd/journald.conf.d/ 2>/dev/null
+}
+
+_maxuse_100m() {
+    grep -rhqE '^[[:space:]]*SystemMaxUse[[:space:]]*=[[:space:]]*100M' \
+        "$LAB_CONF" /etc/systemd/journald.conf.d/ 2>/dev/null
+}
+
+_writing_to_var() {
+    journalctl --header 2>/dev/null | grep -qE 'File path:.*/var/log/journal'
+}
+
+lab_setup() {
+    _reset_journald_conf
+    rm -rf "$LAB_JDIR"
+    systemctl restart systemd-journald >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "/var/log/journal exists" \
+        '[ -d /var/log/journal ]'
+    grade_test "journald is actually writing journal files there" _journal_dir_live
+    grade_test "journalctl reports the journal living under /var/log" _writing_to_var
+    grade_test "Storage=persistent is configured (survives reboot)" _storage_persistent
+    grade_test "SystemMaxUse=100M is configured" _maxuse_100m
+    grade_check "systemd-journald is running" \
+        'systemctl is-active --quiet systemd-journald'
+}
+
+lab_finish() {
+    _reset_journald_conf
+    rm -rf "$LAB_JDIR"
+    systemctl restart systemd-journald >/dev/null 2>&1
+    return 0
+}

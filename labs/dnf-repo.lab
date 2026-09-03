@@ -1,0 +1,122 @@
+# shellcheck shell=bash
+# Source: RH124 ch.12.6 "Enable a DNF Software Repository"
+LAB_TITLE="Define a DNF repository and install from it"
+LAB_TOPIC="13 software-management"
+LAB_NODE="servera"
+
+LAB_REPOID=labrepo
+LAB_REPODIR=/opt/labrepo
+LAB_REPOFILE=/etc/yum.repos.d/labrepo.repo
+LAB_PKG=zsh
+LAB_GPGKEY=/etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+
+lab_describe() {
+    cat <<'EOF'
+  A local package repository has been staged at /opt/labrepo. Its
+  metadata is already built; it just is not known to DNF yet.
+
+  Configure it:
+
+    1. Create /etc/yum.repos.d/labrepo.repo defining a repository whose
+       id is exactly   labrepo
+
+    2. Its baseurl is   file:///opt/labrepo
+
+    3. The repository is enabled.
+
+    4. GPG checking is ON, using the key
+       file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+       (the packages are the signed Rocky ones, so this must succeed -
+       turning gpgcheck off is not an acceptable answer).
+
+    5. Install the package "zsh" from it.
+
+  Verify with:  dnf repolist
+                dnf repoinfo labrepo
+
+  ----- 中文說明 -----
+
+  一個本機套件庫已佈署在 /opt/labrepo。它的 metadata 已經建好,
+  只是 DNF 還不認識它。
+
+  請設定它:
+
+    1. 建立 /etc/yum.repos.d/labrepo.repo,定義一個 id 必須恰好是
+       labrepo 的套件庫
+
+    2. baseurl 是   file:///opt/labrepo
+
+    3. 套件庫為啟用(enabled)狀態。
+
+    4. GPG 檢查必須「開啟」,使用金鑰
+       file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+       (這些套件是有簽章的 Rocky 官方套件,所以驗證一定會成功——
+       把 gpgcheck 關掉不算正確答案)。
+
+    5. 從這個套件庫安裝套件「zsh」。
+
+  驗證:dnf repolist
+        dnf repoinfo labrepo
+EOF
+}
+
+_repo_enabled() {
+    dnf -q repolist --enabled 2>/dev/null | awk '{print $1}' | grep -qx "$LAB_REPOID"
+}
+
+_baseurl_ok() {
+    grep -qE "^[[:space:]]*baseurl[[:space:]]*=[[:space:]]*file:///opt/labrepo/?[[:space:]]*$" "$LAB_REPOFILE" 2>/dev/null
+}
+
+_gpgcheck_on() {
+    grep -qE "^[[:space:]]*gpgcheck[[:space:]]*=[[:space:]]*(1|True|true|yes)[[:space:]]*$" "$LAB_REPOFILE" 2>/dev/null
+}
+
+_gpgkey_set() {
+    grep -qE "^[[:space:]]*gpgkey[[:space:]]*=.*RPM-GPG-KEY-Rocky-10" "$LAB_REPOFILE" 2>/dev/null
+}
+
+_repo_usable() {
+    # repoquery, not `list --available`: once the package is installed it is no
+    # longer "available" and that form would report failure for correct work.
+    dnf -q --disablerepo='*' --enablerepo="$LAB_REPOID" repoquery "$LAB_PKG" 2>/dev/null | grep -q "$LAB_PKG"
+}
+
+lab_setup() {
+    lab_ensure_pkg createrepo_c
+
+    dnf -y -q remove "$LAB_PKG" >/dev/null 2>&1
+    rm -f "$LAB_REPOFILE"
+    rm -rf "$LAB_REPODIR"
+    install -d -m 755 "$LAB_REPODIR"
+
+    # Stage the packages locally so the exercise itself needs no network.
+    if ! dnf -y -q download --destdir "$LAB_REPODIR" --resolve "$LAB_PKG" >/dev/null 2>&1; then
+        lab_warn "could not download $LAB_PKG - servera needs internet access for 'lab start'."
+        return 1
+    fi
+    createrepo_c "$LAB_REPODIR" >/dev/null 2>&1 || return 1
+    dnf clean all >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "/etc/yum.repos.d/labrepo.repo exists" \
+        '[ -f /etc/yum.repos.d/labrepo.repo ]'
+    grade_check "the repository id is exactly [labrepo]" \
+        'grep -qE "^\[labrepo\]" /etc/yum.repos.d/labrepo.repo'
+    grade_test "baseurl points at file:///opt/labrepo" _baseurl_ok
+    grade_test "gpgcheck is enabled"                   _gpgcheck_on
+    grade_test "the Rocky 10 GPG key is referenced"    _gpgkey_set
+    grade_test "dnf lists labrepo among the enabled repositories" _repo_enabled
+    grade_test "packages can actually be read from it" _repo_usable
+    grade_check "the zsh package is installed" 'rpm -q zsh'
+}
+
+lab_finish() {
+    dnf -y -q remove "$LAB_PKG" >/dev/null 2>&1
+    rm -f "$LAB_REPOFILE"
+    rm -rf "$LAB_REPODIR"
+    dnf clean all >/dev/null 2>&1
+    return 0
+}

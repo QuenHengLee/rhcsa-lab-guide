@@ -1,0 +1,142 @@
+# shellcheck shell=bash
+LAB_TITLE="Automount an NFS export from serverb with autofs"
+LAB_TOPIC="05 network-filesystems"
+LAB_NODE="servera"
+
+LAB_PEER=serverb
+LAB_EXPORT=/rhome
+LAB_HOMEDIR=/rhome/remoteuser1
+LAB_MARK=/rhome/remoteuser1/welcome.txt
+
+lab_describe() {
+    cat <<'EOF'
+  serverb exports the directory /rhome over NFS. Inside it is
+  /rhome/remoteuser1, which contains a file called welcome.txt.
+
+  On servera, configure autofs so that:
+
+    - /rhome/remoteuser1 is mounted on demand from
+      serverb.lab.example.com:/rhome/remoteuser1;
+
+    - the mount happens automatically the first time somebody enters the
+      directory, and is unmounted again when idle;
+
+    - it is an INDIRECT map on /rhome - do not hard-code the mount in
+      /etc/fstab;
+
+    - the configuration survives a reboot (autofs enabled, not just
+      started).
+
+  Verify with "ls /rhome/remoteuser1" followed by "findmnt /rhome/remoteuser1".
+
+  ----- 中文說明 -----
+
+  serverb 透過 NFS 匯出目錄 /rhome,其中的 /rhome/remoteuser1 裡有
+  一個檔案 welcome.txt。
+
+  在 servera 上設定 autofs,使得:
+
+    - /rhome/remoteuser1 依需求(on demand)從
+      serverb.lab.example.com:/rhome/remoteuser1 掛載;
+
+    - 第一次有人進入該目錄時自動掛載,閒置一段時間後自動卸載;
+
+    - 必須用 /rhome 上的「間接對映」(INDIRECT map)——不可以把
+      掛載寫死在 /etc/fstab;
+
+    - 設定在重開機後仍有效(autofs 要 enabled,不能只是 started)。
+
+  驗證方式:先「ls /rhome/remoteuser1」,再「findmnt /rhome/remoteuser1」。
+EOF
+}
+
+_autofs_running() {
+    systemctl is-active --quiet autofs && systemctl is-enabled --quiet autofs
+}
+
+_map_configured() {
+    grep -rqs '^[[:space:]]*/rhome' /etc/auto.master /etc/auto.master.d/ 2>/dev/null
+}
+
+_no_fstab_shortcut() {
+    ! awk '!/^[[:space:]]*#/ && $2 ~ /^\/rhome/ { found = 1 } END { exit !found }' /etc/fstab
+}
+
+_automounts() {
+    # Touching the directory must be enough to trigger the mount.
+    ls "$LAB_HOMEDIR"/ >/dev/null 2>&1 || return 1
+    [ -f "$LAB_MARK" ] || return 1
+    findmnt -nro FSTYPE --mountpoint "$LAB_HOMEDIR" 2>/dev/null | grep -q '^nfs'
+}
+
+_from_serverb() {
+    findmnt -nro SOURCE --mountpoint "$LAB_HOMEDIR" 2>/dev/null | grep -q 'serverb'
+}
+
+lab_setup() {
+    lab_ensure_pkg autofs nfs-utils
+
+    if ! lab_peer_reachable "$LAB_PEER"; then
+        lab_warn "$LAB_PEER is not reachable - start it before running this exercise."
+        return 1
+    fi
+
+    # --- prepare the server side ---------------------------------------
+    lab_on_peer "$LAB_PEER" '
+        set -e
+        rpm -q nfs-utils >/dev/null 2>&1 || dnf -y -q install nfs-utils >/dev/null 2>&1
+        install -d -m 755 /rhome/remoteuser1
+        cat > /rhome/remoteuser1/welcome.txt <<TXT
+This file lives on serverb and is reached over NFS.
+TXT
+        chmod 644 /rhome/remoteuser1/welcome.txt
+        grep -q "^/rhome " /etc/exports 2>/dev/null || \
+            echo "/rhome 192.168.56.0/24(rw,sync,no_root_squash)" >> /etc/exports
+        systemctl enable --now nfs-server >/dev/null 2>&1
+        exportfs -r
+        firewall-cmd --permanent --add-service=nfs  >/dev/null 2>&1
+        firewall-cmd --permanent --add-service=rpc-bind >/dev/null 2>&1
+        firewall-cmd --permanent --add-service=mountd   >/dev/null 2>&1
+        firewall-cmd --reload >/dev/null 2>&1
+    ' || { lab_warn "could not prepare the NFS export on $LAB_PEER"; return 1; }
+
+    # --- reset the client side -----------------------------------------
+    systemctl disable --now autofs >/dev/null 2>&1
+    rm -f /etc/auto.master.d/*.autofs
+    umount -R "$LAB_EXPORT" 2>/dev/null
+    lab_fstab_remove "$LAB_HOMEDIR"
+    lab_fstab_remove "$LAB_EXPORT"
+    rm -rf "$LAB_EXPORT"
+    return 0
+}
+
+lab_grade() {
+    grade_check "serverb is reachable" \
+        'ping -c1 -W3 serverb'
+    grade_check "serverb still exports /rhome" \
+        'showmount -e serverb | grep -q /rhome'
+    grade_test "autofs is running and enabled at boot" _autofs_running
+    grade_test "an autofs map covers /rhome" _map_configured
+    grade_test "the mount is NOT hard-coded in /etc/fstab" _no_fstab_shortcut
+    grade_test "entering /rhome/remoteuser1 triggers an NFS mount" _automounts
+    grade_test "the mount really comes from serverb" _from_serverb
+}
+
+lab_finish() {
+    systemctl disable --now autofs >/dev/null 2>&1
+    rm -f /etc/auto.master.d/*.autofs
+    umount -R "$LAB_EXPORT" 2>/dev/null
+    lab_fstab_remove "$LAB_HOMEDIR"
+    lab_fstab_remove "$LAB_EXPORT"
+    rm -rf "$LAB_EXPORT"
+
+    if lab_peer_reachable "$LAB_PEER"; then
+        lab_on_peer "$LAB_PEER" '
+            sed -i "\#^/rhome #d" /etc/exports 2>/dev/null
+            exportfs -r 2>/dev/null
+            systemctl disable --now nfs-server >/dev/null 2>&1
+            rm -rf /rhome
+        ' >/dev/null 2>&1
+    fi
+    return 0
+}

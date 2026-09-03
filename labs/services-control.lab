@@ -1,0 +1,77 @@
+# shellcheck shell=bash
+# Source: RH124 ch.16.4 "Control System Services" + RH134 ch.12.4 "Explore the
+# Boot Process and Select a Boot Target"
+LAB_TITLE="Control services and the default boot target"
+LAB_TOPIC="06 scheduling-and-services"
+LAB_NODE="servera"
+
+lab_describe() {
+    cat <<'EOF'
+  Somebody has left this system in an awkward state. Put it right.
+
+    1. The default boot target has been changed to graphical.target. This
+       is a headless server - set it back to multi-user.target.
+
+    2. The httpd service must be MASKED, so that it cannot be started at
+       all - not by hand, and not as a dependency of something else.
+       Simply disabling it is not enough.
+
+    3. The atd service must be enabled at boot and running right now.
+
+  Verify with "systemctl get-default", "systemctl is-enabled httpd" and
+  "systemctl status atd".
+
+  ----- 中文說明 -----
+
+  有人把這台系統弄得亂七八糟,請恢復正常。
+
+    1. 預設開機 target 被改成了 graphical.target。這是一台無螢幕
+       伺服器——把它改回 multi-user.target。
+
+    2. httpd 服務必須被 MASKED(遮蔽),使它完全無法被啟動——
+       手動啟動不行,被其他服務當作相依帶起來也不行。只有 disable
+       是不夠的。
+
+    3. atd 服務必須設定為開機啟用(enabled),而且現在就要在執行。
+
+  用「systemctl get-default」、「systemctl is-enabled httpd」與
+  「systemctl status atd」驗證。
+EOF
+}
+
+_httpd_masked() {
+    [ "$(systemctl is-enabled httpd 2>/dev/null)" = masked ]
+}
+
+_httpd_unstartable() {
+    systemctl start httpd >/dev/null 2>&1 && { systemctl stop httpd >/dev/null 2>&1; return 1; }
+    return 0
+}
+
+lab_setup() {
+    lab_ensure_pkg httpd at
+    systemctl unmask httpd  >/dev/null 2>&1
+    systemctl disable --now httpd >/dev/null 2>&1
+    systemctl disable --now atd   >/dev/null 2>&1
+    systemctl set-default graphical.target >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "the default target is multi-user.target" \
+        '[ "$(systemctl get-default)" = multi-user.target ]'
+    grade_test "httpd is masked" _httpd_masked
+    grade_test "httpd genuinely cannot be started" _httpd_unstartable
+    grade_check "atd is enabled at boot" \
+        'systemctl is-enabled --quiet atd'
+    grade_check "atd is running now" \
+        'systemctl is-active --quiet atd'
+}
+
+lab_finish() {
+    systemctl set-default multi-user.target >/dev/null 2>&1
+    systemctl unmask httpd >/dev/null 2>&1
+    systemctl disable --now httpd >/dev/null 2>&1
+    systemctl enable --now atd >/dev/null 2>&1
+    return 0
+}

@@ -1,0 +1,103 @@
+# shellcheck shell=bash
+LAB_TITLE="Partition, format XFS and mount persistently by UUID"
+LAB_TOPIC="04 storage"
+LAB_NODE="servera"
+
+LAB_TARGET=/mnt/data
+
+lab_describe() {
+    cat <<'EOF'
+  The disk /dev/nvme0n1 is blank and reserved for practice. The system
+  disk is /dev/sda - never touch it.
+
+    1. Create a single 2 GiB partition on /dev/nvme0n1.
+
+    2. Put an XFS filesystem on it.
+
+    3. Mount it at /mnt/data, and make the mount survive a reboot by
+       referring to the filesystem's UUID in /etc/fstab - not its device
+       name.
+
+  Check your work with "findmnt /mnt/data" before grading.
+
+  ----- 中文說明 -----
+
+  磁碟 /dev/nvme0n1 是空白的練習碟。系統碟是 /dev/sda——絕對不可以
+  動它。
+
+    1. 在 /dev/nvme0n1 建立一個 2 GiB 的分割區。
+
+    2. 在上面建立 XFS 檔案系統。
+
+    3. 掛載在 /mnt/data,並在 /etc/fstab 中以檔案系統的 UUID(而不是
+       裝置名稱)設定,讓掛載在重開機後仍然有效。
+
+  評分之前先用「findmnt /mnt/data」檢查你的成果。
+EOF
+}
+
+_partdev() {
+    local p
+    p=$(lsblk -nro NAME "$LAB_DISK1" 2>/dev/null | tail -n +2 | head -1)
+    [ -n "$p" ] || return 1
+    printf '/dev/%s\n' "$p"
+}
+
+_size_ok() {
+    local d b
+    d=$(_partdev) || return 1
+    b=$(lsblk -nbdo SIZE "$d" 2>/dev/null) || return 1
+    # 2 GiB, allowing for alignment slack either way.
+    [ "$b" -ge 2040109465 ] && [ "$b" -le 2362232012 ]
+}
+
+_is_xfs() {
+    local d
+    d=$(_partdev) || return 1
+    [ "$(blkid -s TYPE -o value "$d" 2>/dev/null)" = xfs ]
+}
+
+_mounted_here() {
+    local d
+    d=$(_partdev) || return 1
+    [ "$(findmnt -nro SOURCE --mountpoint "$LAB_TARGET" 2>/dev/null)" = "$d" ]
+}
+
+_fstab_by_uuid() {
+    local spec d
+    spec=$(awk -v m="$LAB_TARGET" '!/^[[:space:]]*#/ && $2 == m { print $1; exit }' /etc/fstab)
+    case "$spec" in
+        UUID=*) ;;
+        *) return 1 ;;
+    esac
+    d=$(_partdev) || return 1
+    [ "${spec#UUID=}" = "$(blkid -s UUID -o value "$d" 2>/dev/null)" ]
+}
+
+lab_setup() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    rm -rf "$LAB_TARGET"
+    lab_wipe_disk "$LAB_DISK1"
+    return 0
+}
+
+lab_grade() {
+    grade_test "a partition exists on /dev/nvme0n1" _partdev
+    grade_test "the partition is 2 GiB" _size_ok
+    grade_test "it holds an XFS filesystem" _is_xfs
+    grade_test "it is mounted at /mnt/data right now" _mounted_here
+    grade_check "/etc/fstab has an entry for /mnt/data" \
+        'lab_fstab_has /mnt/data'
+    grade_test "the fstab entry uses UUID= and matches this filesystem" _fstab_by_uuid
+    grade_check "the fstab file is free of errors" \
+        'findmnt --verify --verbose >/dev/null'
+}
+
+lab_finish() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    rm -rf "$LAB_TARGET"
+    lab_wipe_disk "$LAB_DISK1"
+    return 0
+}

@@ -1,0 +1,129 @@
+# shellcheck shell=bash
+# Source: RH134 ch.1.4 "Write Simple Bash Scripts" and ch.1.6 "Run Loops and
+# Conditional Commands". Covers the RHCSA objective "create simple shell
+# scripts": loops, conditionals, positional parameters and exit codes.
+LAB_TITLE="Write a shell script with a loop, a conditional and arguments"
+LAB_TOPIC="10 shell-scripting"
+LAB_NODE="servera"
+
+LAB_SCRIPT=/usr/local/bin/userreport.sh
+LAB_USERS=(labuser1 labuser2)
+
+lab_describe() {
+    cat <<'EOF'
+  Write an executable shell script at /usr/local/bin/userreport.sh that
+  behaves exactly as follows.
+
+  Given one or more usernames as arguments, it prints one line per
+  argument, in the order given:
+
+      * if the account exists:
+            username:UID:login-shell
+        for example    labuser1:1001:/bin/bash
+
+      * if the account does not exist:
+            username:NOT FOUND
+
+  Given NO arguments at all, it prints exactly
+
+      usage: userreport.sh USER [USER...]
+
+  and exits with status 2. Otherwise it exits with status 0.
+
+  It must loop over the arguments - a script that only handles the first
+  one, or that hard-codes the usernames, will not pass.
+
+  The accounts labuser1 and labuser2 already exist for you to test with.
+
+  ----- 中文說明 -----
+
+  在 /usr/local/bin/userreport.sh 寫一個可執行的 shell 腳本,行為
+  必須完全符合以下規格。
+
+  收到一個或多個使用者名稱作為參數時,依參數順序、每個參數印出
+  一行:
+
+      * 帳號存在時:
+            username:UID:login-shell
+        例如    labuser1:1001:/bin/bash
+
+      * 帳號不存在時:
+            username:NOT FOUND
+
+  完全沒有參數時,必須精確印出
+
+      usage: userreport.sh USER [USER...]
+
+  並以狀態碼 2 結束。其他情況以狀態碼 0 結束。
+
+  腳本必須用「迴圈」處理參數——只處理第一個參數、或把使用者名稱
+  寫死的腳本不會過關。
+
+  帳號 labuser1 與 labuser2 已建好,供你測試。
+EOF
+}
+
+_expected_line() {
+    local u=$1 e
+    if e=$(getent passwd "$u"); then
+        printf '%s:%s:%s\n' "$u" "$(printf '%s' "$e" | cut -d: -f3)" "$(printf '%s' "$e" | cut -d: -f7)"
+    else
+        printf '%s:NOT FOUND\n' "$u"
+    fi
+}
+
+_runs_three_args() {
+    local want got
+    want=$( _expected_line labuser1; _expected_line nosuchuser42; _expected_line labuser2 )
+    got=$("$LAB_SCRIPT" labuser1 nosuchuser42 labuser2 2>/dev/null)
+    [ "$got" = "$want" ]
+}
+
+# Different arguments in a different order: catches hard-coded output.
+_runs_other_args() {
+    local want got
+    want=$( _expected_line labuser2; _expected_line root )
+    got=$("$LAB_SCRIPT" labuser2 root 2>/dev/null)
+    [ "$got" = "$want" ]
+}
+
+_no_args_message() {
+    [ "$("$LAB_SCRIPT" 2>&1)" = "usage: userreport.sh USER [USER...]" ]
+}
+
+_no_args_exit() {
+    "$LAB_SCRIPT" >/dev/null 2>&1
+    [ "$?" = 2 ]
+}
+
+_good_exit() {
+    "$LAB_SCRIPT" labuser1 >/dev/null 2>&1
+}
+
+lab_setup() {
+    local u
+    rm -f "$LAB_SCRIPT"
+    lab_user_del "${LAB_USERS[@]}"
+    for u in "${LAB_USERS[@]}"; do
+        useradd -m "$u" || return 1
+    done
+    return 0
+}
+
+lab_grade() {
+    grade_check "/usr/local/bin/userreport.sh exists" \
+        '[ -f /usr/local/bin/userreport.sh ]'
+    grade_check "it is executable" \
+        '[ -x /usr/local/bin/userreport.sh ]'
+    grade_test "three arguments produce the three expected lines" _runs_three_args
+    grade_test "a different argument list still produces correct output" _runs_other_args
+    grade_test "with no arguments it prints the usage message" _no_args_message
+    grade_test "with no arguments it exits with status 2" _no_args_exit
+    grade_test "with valid arguments it exits with status 0" _good_exit
+}
+
+lab_finish() {
+    rm -f "$LAB_SCRIPT"
+    lab_user_del "${LAB_USERS[@]}"
+    return 0
+}

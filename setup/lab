@@ -1,0 +1,180 @@
+#!/bin/bash
+# lab - RHCSA practice environment manager.
+#
+#   lab list              show every available exercise
+#   lab describe <name>   print the task without changing anything
+#   lab start <name>      prepare the environment, then print the task
+#   lab grade <name>      check your work
+#   lab finish <name>     clean the exercise away again
+#
+# Modelled on the Red Hat classroom "lab" command.
+
+# No pipefail here on purpose. Grading checks are full of `big-output-command
+# | grep -q ...`; grep exits as soon as it matches, the producer dies of
+# SIGPIPE with status 141, and under pipefail that would turn a passing check
+# into a failing one.
+set -u
+
+LAB_HOME=/usr/local/share/rhcsa-labs
+
+[ -r "$LAB_HOME/lib/common.sh" ] || {
+    echo "error: $LAB_HOME/lib/common.sh is missing." >&2
+    exit 1
+}
+
+# Everything a lab does - creating users, wiping disks, reading /etc/shadow -
+# needs root. student has passwordless sudo, so just re-exec.
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo -- "$0" "$@"
+fi
+
+# shellcheck source=/dev/null
+. "$LAB_HOME/lib/common.sh"
+
+install -d -m 755 "$LAB_STATE"
+
+usage() {
+    cat <<'EOF'
+Usage: lab <command> [exercise]
+
+Commands:
+  list                 List all available exercises.
+  describe <name>      Show the task text without touching the system.
+  start <name>         Reset and prepare the environment, then show the task.
+  grade <name>         Check your work and report what is still missing.
+  finish <name>        Remove everything the exercise created.
+
+Examples:
+  lab list
+  lab start storage-lvm
+  lab grade storage-lvm
+  lab finish storage-lvm
+EOF
+}
+
+lab_names() {
+    local f
+    for f in "$LAB_LABDIR"/*.lab; do
+        [ -e "$f" ] || continue
+        basename "$f" .lab
+    done
+}
+
+lab_meta() {
+    # Runs in a subshell so a lab file can never leak state into the caller.
+    local name=$1 field=$2
+    (
+        # shellcheck source=/dev/null
+        . "$LAB_LABDIR/$name.lab" 2>/dev/null
+        case $field in
+            title) printf '%s\n' "${LAB_TITLE:-}" ;;
+            topic) printf '%s\n' "${LAB_TOPIC:-}" ;;
+            node)  printf '%s\n' "${LAB_NODE:-servera}" ;;
+        esac
+    )
+}
+
+cmd_list() {
+    local name topic title node prev=""
+    lab_head "RHCSA practice exercises"
+    printf '\n'
+    while read -r name; do
+        printf '%s\t%s\t%s\t%s\n' \
+            "$(lab_meta "$name" topic)" "$name" \
+            "$(lab_meta "$name" node)" "$(lab_meta "$name" title)"
+    done < <(lab_names) | sort | while IFS=$'\t' read -r topic name node title; do
+        if [ "$topic" != "$prev" ]; then
+            printf '\n  %s%s%s\n' "$C_CYN" "$topic" "$C_0"
+            prev=$topic
+        fi
+        printf '    %-22s %-9s %s\n' "$name" "[$node]" "$title"
+    done
+    cat <<EOF
+
+  Run 'lab describe <name>' to read a task, 'lab start <name>' to begin.
+  The [node] column says which machine the exercise is performed on.
+
+EOF
+}
+
+require_lab() {
+    local name=${1:-}
+    [ -n "$name" ] || { usage; exit 1; }
+    if [ ! -r "$LAB_LABDIR/$name.lab" ]; then
+        printf '%serror:%s no such exercise: %s\n\n' "$C_RED" "$C_0" "$name" >&2
+        printf 'Available:\n' >&2
+        lab_names | sed 's/^/  /' >&2
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    . "$LAB_LABDIR/$name.lab"
+    LAB_NODE=${LAB_NODE:-servera}
+    if [ "$(lab_this_node)" != "$LAB_NODE" ] && [ "$LAB_NODE" != "any" ]; then
+        lab_warn "this exercise is designed for $LAB_NODE; you are on $(lab_this_node)."
+    fi
+}
+
+banner() {
+    local name=$1
+    lab_head "$LAB_TITLE"
+    printf '  exercise : %s\n  topic    : %s\n  node     : %s\n' \
+        "$name" "$LAB_TOPIC" "$LAB_NODE"
+}
+
+cmd_describe() {
+    banner "$1"
+    lab_head "Task"
+    lab_describe
+    printf '\n'
+}
+
+cmd_start() {
+    local name=$1
+    banner "$name"
+    lab_head "Preparing"
+    if lab_setup; then
+        printf '  environment ready.\n'
+    else
+        lab_die "setup failed; the environment may be half-built. Try 'lab finish $name' first."
+    fi
+    date -Is > "$LAB_STATE/$name.started"
+    lab_head "Task"
+    lab_describe
+    cat <<EOF
+
+  When you are done:  lab grade $name
+  To clean up:        lab finish $name
+
+EOF
+}
+
+cmd_grade() {
+    local name=$1
+    banner "$name"
+    if [ ! -f "$LAB_STATE/$name.started" ]; then
+        lab_warn "'lab start $name' has not been run; grading against the current system anyway."
+    fi
+    lab_head "Checking"
+    lab_grade
+    lab_grade_summary
+}
+
+cmd_finish() {
+    local name=$1
+    banner "$name"
+    lab_head "Cleaning up"
+    lab_finish
+    rm -f "$LAB_STATE/$name.started"
+    printf '  done.\n\n'
+}
+
+cmd=${1:-}
+case "$cmd" in
+    list)              cmd_list ;;
+    describe|show)     require_lab "${2:-}"; cmd_describe "$2" ;;
+    start|setup)       require_lab "${2:-}"; cmd_start    "$2" ;;
+    grade|check)       require_lab "${2:-}"; cmd_grade    "$2" ;;
+    finish|cleanup)    require_lab "${2:-}"; cmd_finish   "$2" ;;
+    -h|--help|help|"") usage ;;
+    *)                 printf 'error: unknown command: %s\n\n' "$cmd" >&2; usage; exit 1 ;;
+esac

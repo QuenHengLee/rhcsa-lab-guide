@@ -1,0 +1,902 @@
+<title>RHCSA 實作題解手冊</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F7F8F6; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --line:#DDE4DF; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A;
+}
+/* 固定亮色版面:不跟隨系統/檢視器的深色主題 */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;}
+.wrap{max-width:880px;margin:0 auto;padding:48px 24px 96px}
+h1,h2,h3{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:34px;font-weight:700;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 28px;max-width:62ch}
+h2{font-size:22px;font-weight:700;margin:0;padding-top:8px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px;letter-spacing:.05em}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.92em;background:var(--chip);padding:1px 6px;border-radius:4px}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;
+  padding:14px 16px;margin:10px 0;overflow-x:auto;
+  font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term code{background:none;padding:0;color:inherit;font-size:inherit}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+/* workflow strip */
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:20px 0 8px}
+.flow .step{background:var(--card);border:1px solid var(--line);border-radius:6px;
+  padding:8px 14px;font-family:"IBM Plex Mono",monospace;font-size:13px}
+.flow .step b{color:var(--accent-ink);font-weight:600}
+.flow .arr{color:var(--muted)}
+/* toc */
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin:24px 0 8px;padding:0;list-style:none}
+.toc li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.toc a{color:var(--ink);text-decoration:none;font-weight:500}
+.toc a:hover,.toc a:focus-visible{color:var(--accent-ink)}
+.toc .tno{font-family:"IBM Plex Mono",monospace;color:var(--accent);font-size:12.5px;display:block;letter-spacing:.06em}
+.toc .cnt{color:var(--muted);font-size:12.5px;font-weight:400}
+/* topic + exercise */
+.topic{margin-top:56px;border-top:2px solid var(--accent);padding-top:14px}
+article.ex{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:22px 24px 18px;margin:22px 0}
+article.ex>header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:4px}
+article.ex h3{font-size:17.5px;font-weight:600;margin:0}
+article.ex h3 .zh{color:var(--muted);font-weight:500;margin-left:.6em}
+.name{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;
+  color:var(--accent-ink);background:var(--chip);border-radius:5px;padding:2px 9px}
+.node{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:1px 10px;white-space:nowrap}
+.phase{border-top:1px dashed var(--line);padding:12px 0 4px;margin-top:12px}
+.phase h4{margin:0 0 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+  font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:600}
+.phase p{margin:6px 0;max-width:70ch}
+.phase ol{margin:6px 0 6px 2px;padding-left:22px}
+.phase ol li{margin:8px 0}
+.phase ol li p{margin:4px 0}
+.duo{display:flex;flex-wrap:wrap;gap:0 40px}
+.duo .phase{flex:1 1 260px}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:8px 14px;margin:10px 0;font-size:14.5px;max-width:72ch}
+.note code{background:transparent;color:inherit;padding:0}
+a.top{color:var(--muted);font-size:13px;text-decoration:none}
+a.top:hover{color:var(--accent-ink)}
+footer{margin-top:64px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:16px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 複製按鈕 */
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;
+  color:var(--term-ink);background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+/* 練習次數紀錄 */
+.praxis{display:flex;align-items:center;gap:7px;margin:0 0 10px;
+  border-bottom:1px dashed var(--line);padding-bottom:10px}
+.praxis .plabel{font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.praxis input[type=checkbox]{width:17px;height:17px;margin:0;
+  accent-color:var(--accent);cursor:pointer}
+.praxis .pcount{margin-left:auto;font-family:"IBM Plex Mono",monospace;
+  font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">servera / serverb · Rocky Linux 10 · 33 exercises</p>
+<h1>RHCSA 實作題解手冊</h1>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 33 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行。</p>
+
+<div class="flow">
+  <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
+  <span class="step">動手解題</span><span class="arr">→</span>
+  <span class="step"><b>lab grade</b> 題目名 <span style="color:var(--muted)">逐項檢查</span></span><span class="arr">→</span>
+  <span class="step"><b>lab finish</b> 題目名 <span style="color:var(--muted)">清除還原</span></span>
+</div>
+<p class="sub" style="margin-top:6px"><code>lab grade</code> 可以重複執行,沒過就繼續改;<code>lab describe 題目名</code> 只看題目不動系統(中英雙語)。先看完題目、自己做過一輪,卡住再看本手冊的解法,效果最好。</p>
+<p class="note"><strong>本手冊的解題原則:最短能過關。</strong>所有解法都只保留「評分必要」的指令與選項,非必要的保險選項(如 <code>-xdev</code>、額外的 daemon-reload)一律省略——好記、好打、考場夠用。</p>
+
+<h2 style="margin-top:24px">目錄</h2>
+<ul class="toc">
+  <li><a href="#t01"><span class="tno">01</span>essential-tools <span class="cnt">3 題</span></a></li>
+  <li><a href="#t02"><span class="tno">02</span>users-and-groups <span class="cnt">2 題</span></a></li>
+  <li><a href="#t03"><span class="tno">03</span>permissions <span class="cnt">3 題</span></a></li>
+  <li><a href="#t04"><span class="tno">04</span>storage <span class="cnt">5 題</span></a></li>
+  <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">2 題</span></a></li>
+  <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">5 題</span></a></li>
+  <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">2 題</span></a></li>
+  <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">5 題</span></a></li>
+  <li><a href="#t09"><span class="tno">09</span>containers <span class="cnt">1 題</span></a></li>
+  <li><a href="#t10"><span class="tno">10</span>shell-scripting <span class="cnt">1 題</span></a></li>
+  <li><a href="#t11"><span class="tno">11</span>processes-and-logs <span class="cnt">2 題</span></a></li>
+  <li><a href="#t12"><span class="tno">12</span>software + boot <span class="cnt">2 題</span></a></li>
+</ul>
+
+<!-- ============ 01 ============ -->
+<section class="topic" id="t01"><h2><span class="no">01</span>essential-tools 基本工具</h2>
+
+<article class="ex" id="tools-find">
+<header><span class="name">tools-find</span><h3>Find files by owner and collect them<span class="zh">依擁有者尋找並收集檔案</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start tools-find</pre>
+<p>把系統上所有屬於使用者 simone 的一般檔案複製到 <code>/root/found</code>;別人的檔案不可以混進去。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">$</span> sudo -i
+<span class="p">#</span> mkdir /root/found
+<span class="p">#</span> find / -type f -user simone -exec cp {} /root/found/ \; 2&gt;/dev/null</pre>
+<p>只要記三件事:<code>-type f</code> 一般檔案、<code>-user simone</code> 依擁有者、<code>-exec cp {} 目的地 \;</code> 逐檔複製。<code>2&gt;/dev/null</code> 把掃到 /proc 的雜訊丟掉。同名但屬於 root 的誘餌檔會被 <code>-user</code> 自然排除。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls /root/found        <span class="c"># 應有 5 個 simone 的檔案</span>
+<span class="p">#</span> lab grade tools-find</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish tools-find</pre></div>
+</div></article>
+
+<article class="ex" id="tools-grep-tar">
+<header><span class="name">tools-grep-tar</span><h3>Filter a log with grep, then archive<span class="zh">grep 過濾日誌並打包</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start tools-grep-tar</pre>
+<p>把 <code>/opt/lab/system.log</code> 中含 ERROR 的行(保持順序)存到 <code>/root/errors.txt</code>,再打包成 bzip2 壓縮的 <code>/root/errors.tar.bz2</code>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> grep ERROR /opt/lab/system.log &gt; /root/errors.txt
+<span class="p">#</span> tar -cjf /root/errors.tar.bz2 -C /root errors.txt</pre>
+<p>grep 預設區分大小寫,小寫 "error" 的 WARNING 行自然不會入選。<code>-j</code> 是 bzip2;<code>-C /root</code> 讓壓縮檔裡是 <code>errors.txt</code> 而不是完整路徑。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> tar -tjf /root/errors.tar.bz2
+<span class="p">#</span> lab grade tools-grep-tar</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish tools-grep-tar</pre></div>
+</div></article>
+
+<article class="ex" id="tools-links">
+<header><span class="name">tools-links</span><h3>Hard links and symbolic links<span class="zh">硬連結與符號連結</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start tools-links</pre>
+<p>為 <code>/opt/labdata/original.txt</code> 建立硬連結 <code>hard.txt</code> 與符號連結 <code>soft.txt</code>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> ln    /opt/labdata/original.txt /opt/labdata/hard.txt
+<span class="p">#</span> ln -s original.txt              /opt/labdata/soft.txt</pre>
+<p>符號連結用相對路徑 <code>original.txt</code> 即可(兩檔同目錄)。用 <code>ls -li /opt/labdata</code> 觀察:hard.txt 與原檔 inode 相同、link count 變 2;soft.txt 是獨立 inode 的 <code>l</code> 類型。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls -li /opt/labdata
+<span class="p">#</span> lab grade tools-links</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish tools-links</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 02 ============ -->
+<section class="topic" id="t02"><h2><span class="no">02</span>users-and-groups 使用者與群組</h2>
+
+<article class="ex" id="users-basic">
+<header><span class="name">users-basic</span><h3>Users, groups, shells, UIDs, ageing<span class="zh">帳號、群組、shell、UID 與密碼期限</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start users-basic</pre>
+<p>建立群組 manager;natasha/harry 以它為附加群組;sarah 用 nologin 且不屬於 manager;jean 的 UID 為 4332;四人密碼都是 <code>Redhat123!</code>;natasha 密碼最長 30 天。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> groupadd manager
+<span class="p">#</span> useradd -G manager natasha
+<span class="p">#</span> useradd -G manager harry
+<span class="p">#</span> useradd -s /sbin/nologin sarah
+<span class="p">#</span> useradd -u 4332 jean
+<span class="p">#</span> echo 'Redhat123!' | passwd --stdin natasha
+<span class="p">#</span> echo 'Redhat123!' | passwd --stdin harry
+<span class="p">#</span> echo 'Redhat123!' | passwd --stdin sarah
+<span class="p">#</span> echo 'Redhat123!' | passwd --stdin jean
+<span class="p">#</span> chage -M 30 natasha</pre>
+<p>關鍵是 <code>-G</code>(大寫)= 附加群組;小寫 <code>-g</code> 會變主要群組,評分不過。<code>chage -M 30</code> 設密碼最長使用天數。設密碼一人一行照打即可,不需要迴圈。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> id natasha; chage -l natasha
+<span class="p">#</span> lab grade users-basic</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish users-basic</pre></div>
+</div></article>
+
+<article class="ex" id="users-sudo">
+<header><span class="name">users-sudo</span><h3>Grant a group passwordless sudo<span class="zh">給群組免密碼 sudo</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start users-sudo</pre>
+<p>建立 opsuser(附加群組 operators,密碼 <code>Redhat123!</code>),並讓 operators 全體成員免密碼執行任何指令。規則必須授予「群組」而非個人。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> useradd -G operators opsuser
+<span class="p">#</span> echo 'Redhat123!' | passwd --stdin opsuser
+<span class="p">#</span> echo '%operators ALL=(ALL) NOPASSWD: ALL' &gt; /etc/sudoers.d/operators
+<span class="p">#</span> chmod 440 /etc/sudoers.d/operators
+<span class="p">#</span> visudo -cf /etc/sudoers.d/operators   <span class="c"># 語法檢查</span></pre>
+<p>放 <code>/etc/sudoers.d/</code> 而不是直接編 sudoers;<code>%operators</code> 的百分號代表群組。評分會檢查 <code>visudo -c</code> 過關、規則來自群組。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> sudo -l -U opsuser
+<span class="p">#</span> lab grade users-sudo</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish users-sudo</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 03 ============ -->
+<section class="topic" id="t03"><h2><span class="no">03</span>permissions 權限</h2>
+
+<article class="ex" id="perms-acl">
+<header><span class="name">perms-acl</span><h3>Per-user access with POSIX ACLs<span class="zh">用 ACL 做個別使用者授權</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start perms-acl</pre>
+<p>複製 <code>/etc/fstab</code> 到 <code>/var/tmp/fstab</code>(root 擁有),ACL 設定:natasha 可讀寫、harry 完全不可、其他人唯讀。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> cp /etc/fstab /var/tmp/fstab
+<span class="p">#</span> setfacl -m u:natasha:rw-,u:harry:---,o::r-- /var/tmp/fstab</pre>
+<p>以 root 執行 cp,擁有者自然是 root。<code>setfacl -m</code> 可以用逗號一次設定多條;mask 會自動算成 rw-,不會吃掉 natasha 的寫入權。分成三行各設一條也完全可以。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> getfacl /var/tmp/fstab
+<span class="p">#</span> lab grade perms-acl</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish perms-acl</pre></div>
+</div></article>
+
+<article class="ex" id="perms-collab">
+<header><span class="name">perms-collab</span><h3>Collaborative directory (setgid + sticky)<span class="zh">setgid + sticky 協作目錄</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start perms-collab</pre>
+<p>建立 <code>/home/accounting</code>:群組 accounting 擁有、成員可讀寫進入、外人無權限、新檔自動繼承群組、成員只能刪自己的檔。真實考題和這題一樣<strong>只描述行為,不會給你權限數字</strong>——數字要自己推。</p></div>
+<div class="phase"><h4>② 概念:特殊權限位的規則</h4>
+<p>chmod 的數字其實有<strong>四位</strong>:最前面一位是「特殊權限」,後三位才是熟悉的 owner/group/other。</p>
+<pre class="term">chmod  <span class="p">3</span> 7 7 0
+       │ │ │ └ other
+       │ │ └── group
+       │ └──── owner
+       └────── 特殊位:setuid=4、setgid=2、sticky=1(可相加)</pre>
+<p>三個特殊位「用在目錄上」的意義(考的就是這個):</p>
+<pre class="term">setgid (2)  在此目錄建立的新檔/新子目錄,群組自動 = 目錄的群組
+            <span class="c">→ 對應題目「每個檔案自動群組擁有為 accounting」</span>
+sticky (1)  目錄內的檔案,只有「檔案擁有者」能刪或改名
+            <span class="c">→ 對應題目「成員只能刪自己的檔案」(範本:/tmp 就是 1777)</span>
+setuid (4)  對目錄無作用(用在執行檔上:以檔案擁有者身分執行,如 passwd)</pre>
+<p>推導本題數字:行為需要 setgid+sticky → 2+1=<strong>3</strong>;成員可讀寫進入 → group=rwx=<strong>7</strong>;擁有者照慣例全開 → <strong>7</strong>;外人無權限 → <strong>0</strong>。合起來 <strong>3770</strong>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> mkdir /home/accounting
+<span class="p">#</span> chgrp accounting /home/accounting
+<span class="p">#</span> chmod 3770 /home/accounting</pre>
+<p>不想算數字,用符號法一樣過關:<code>chmod 770 目錄</code> 之後 <code>chmod g+s,o+t 目錄</code>(<code>g+s</code>=setgid、<code>o+t</code>=sticky)。兩種殊途同歸,考場挑順手的。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls -ld /home/accounting
+drwxrws--T. ... root accounting ...
+<span class="c">    │  └ 群組 x 位變 s = setgid 生效
+    └ 結尾 T = sticky(大寫因 other 無 x;/tmp 是小寫 t)</span>
+<span class="p">#</span> stat -c '%a %G' /home/accounting   <span class="c"># 3770 accounting</span>
+<span class="p">#</span> lab grade perms-collab</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish perms-collab</pre></div>
+</div>
+<p class="note">實測手感:<code>su - amy</code> 進去 <code>touch /home/accounting/a.txt</code>,再 <code>ls -l</code> 看群組是否自動變 accounting;換 <code>su - ben</code> 試著 <code>rm a.txt</code>,會被 sticky 擋下——這兩個動作做一次,setgid/sticky 就再也不會忘。</p></article>
+
+<article class="ex" id="perms-umask">
+<header><span class="name">perms-umask</span><h3>Default permissions with umask<span class="zh">用 umask 設預設權限</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start perms-umask</pre>
+<p>讓 webdev 的新登入 shell 中,新檔 640、新目錄 750,而且登出再登入仍有效;其他使用者不受影響。題目通常只給你「640 / 750」這兩個目標權限,umask 的值要自己推。</p></div>
+<div class="phase"><h4>② 概念:umask 為什麼是 0027</h4>
+<p>umask 是「從系統給的起始滿分裡<strong>扣掉</strong>」的遮罩。起始滿分是固定的:新目錄 <strong>777</strong>、新檔 <strong>666</strong>(檔案起始就沒有 x,系統絕不讓新檔自動可執行)。逐位相減:</p>
+<pre class="term"><span class="c">              owner group other</span>
+目錄 777  −  umask = <span class="p">750</span>   →  7-<b>0</b>=7 · 7-<b>2</b>=5 · 7-<b>7</b>=0
+檔案 666  −  umask = <span class="p">640</span>   →  6-<b>0</b>=6 · 6-<b>2</b>=4 · 6-<b>6</b>=0
+                                   ┌──────────────┐
+                          umask =  │ 0  2  7 │ → 0027
+                                   └──────────────┘</pre>
+<p>三位的意義:owner 扣 <b>0</b>(自己全保留)、group 扣 <b>2</b>(拿掉 write,變唯讀)、other 扣 <b>7</b>(rwx 全拿掉,外人無權限)。最前面那個 <b>0</b> 是特殊權限位,umask 幾乎永遠寫 0,所以 <code>umask 027</code> 三位寫法完全等價。</p>
+<p class="note"><strong>反推口訣:一律用「目錄那組」算 → 777 − 目標目錄權限。</strong>因為檔案起始的 666 本來就沒有 x,「遮罩有沒有擋 x」在檔案上看不出來(6 遇到遮罩 6 或 7 結果都是 0),只有目錄的 777 才顯示得出完整遮罩。若題目只給檔案權限(如「新檔 640」),先翻成對應目錄權限(有讀寫的類別補上 x:640→750)再算 777−750=027。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> echo 'umask 0027' &gt;&gt; /home/webdev/.bashrc</pre>
+<p>一行搞定:寫進「webdev 個人的」<code>.bashrc</code>。RHEL 預設的 <code>.bash_profile</code> 會 source <code>.bashrc</code>,所以登入 shell 也吃得到。不要動 <code>/etc/profile</code>——那會影響所有人,評分會抓。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> su - webdev -c umask   <span class="c"># 0027</span>
+<span class="p">#</span> lab grade perms-umask</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish perms-umask</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 04 ============ -->
+<section class="topic" id="t04"><h2><span class="no">04</span>storage 儲存</h2>
+<p class="note">練習碟是 <code>/dev/nvme0n1</code> 與 <code>/dev/nvme0n2</code>;系統碟 <code>/dev/sda</code> 絕對不要動。改完 <code>/etc/fstab</code> 一定用 <code>mount -a</code> 測試——fstab 打錯字是「下次開不了機」等級的錯誤。若 mount 警告 fstab 已變更,跑一下 <code>systemctl daemon-reload</code> 消掉即可,不影響評分。</p>
+
+<article class="ex" id="storage-partition">
+<header><span class="name">storage-partition</span><h3>Partition, XFS, mount by UUID<span class="zh">分割、XFS、以 UUID 持久掛載</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start storage-partition</pre>
+<p>在 nvme0n1 建 2 GiB 分割區、做 XFS、掛載 <code>/mnt/data</code>,fstab 必須用 UUID。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> parted /dev/nvme0n1 mklabel gpt
+<span class="p">#</span> parted /dev/nvme0n1 mkpart data xfs 1MiB 2049MiB
+<span class="p">#</span> mkfs.xfs /dev/nvme0n1p1
+<span class="p">#</span> mkdir -p /mnt/data
+<span class="p">#</span> blkid /dev/nvme0n1p1     <span class="c"># 抄下 UUID</span>
+<span class="p">#</span> echo 'UUID=這裡貼UUID /mnt/data xfs defaults 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> mount -a
+<span class="p">#</span> findmnt /mnt/data</pre>
+<p>1MiB–2049MiB 恰好 2 GiB 且對齊。也可用 <code>fdisk /dev/nvme0n1</code> 互動式操作(g 建 GPT、n 新增、+2G)。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> findmnt --verify
+<span class="p">#</span> lab grade storage-partition</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-partition</pre></div>
+</div></article>
+
+<article class="ex" id="storage-lvm">
+<header><span class="name">storage-lvm</span><h3>Volume group with custom extent size<span class="zh">自訂 extent 大小的 VG</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start storage-lvm</pre>
+<p>nvme0n1 上建 PV;VG 叫 wgroup、PE 大小 8 MiB;LV 叫 wshare、大小「100 個 extents」;格式化 VFAT、持久掛載 <code>/mnt/wshare</code>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> parted /dev/nvme0n1 mklabel gpt
+<span class="p">#</span> parted /dev/nvme0n1 mkpart lvm 1MiB 1025MiB
+<span class="p">#</span> pvcreate /dev/nvme0n1p1
+<span class="p">#</span> vgcreate -s 8M wgroup /dev/nvme0n1p1
+<span class="p">#</span> lvcreate -l 100 -n wshare wgroup
+<span class="p">#</span> mkfs.vfat /dev/wgroup/wshare
+<span class="p">#</span> mkdir -p /mnt/wshare
+<span class="p">#</span> echo '/dev/wgroup/wshare /mnt/wshare vfat defaults 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> mount -a</pre>
+<p>兩個容易丟分的點:<code>vgcreate -s 8M</code>(PE 大小)與 <code>lvcreate -l 100</code>(小寫 l = extents 數;大寫 L 是位元組大小,題目明講不能用)。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> vgdisplay wgroup | grep 'PE Size'
+<span class="p">#</span> lab grade storage-lvm</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-lvm</pre></div>
+</div></article>
+
+<article class="ex" id="storage-lvm-extend">
+<header><span class="name">storage-lvm-extend</span><h3>Extend an LV and its filesystem<span class="zh">線上擴充 LV 與檔案系統</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start storage-lvm-extend</pre>
+<p>把掛在 <code>/mnt/vo</code> 的 testvg/vo(512 MiB)連同 XFS 一起擴充到至少 1 GiB,裡面的 company-data.txt 一個位元組都不能少。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> lvextend -r -L 1G /dev/testvg/vo</pre>
+<p>一行解決:<code>-L 1G</code> 設定目標大小,<code>-r</code> 同時放大檔案系統(等同再跑 <code>xfs_growfs /mnt/vo</code>)。XFS 支援線上擴充,不需要卸載;注意 XFS「只能變大不能縮小」。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> df -h /mnt/vo   <span class="c"># 容量應約 1G</span>
+<span class="p">#</span> lab grade storage-lvm-extend</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-lvm-extend</pre></div>
+</div></article>
+
+<article class="ex" id="storage-swap">
+<header><span class="name">storage-swap</span><h3>Add a swap partition<span class="zh">新增 swap 分割區</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start storage-swap</pre>
+<p>在 nvme0n2 建 512 MiB swap 分割區,立即啟用並設定開機自動啟用;原本的 swap 不可動。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> parted /dev/nvme0n2 mklabel gpt
+<span class="p">#</span> parted /dev/nvme0n2 mkpart swap linux-swap 1MiB 513MiB
+<span class="p">#</span> mkswap /dev/nvme0n2p1
+<span class="p">#</span> blkid /dev/nvme0n2p1     <span class="c"># 抄下 UUID</span>
+<span class="p">#</span> echo 'UUID=這裡貼UUID none swap defaults 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> swapon -a</pre>
+<p><code>mkswap</code> 輸出裡也會直接印出 UUID。用 <code>swapon -a</code> 讀 fstab 啟用,可以順便驗證 fstab 寫對了。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> swapon --show   <span class="c"># 新舊兩個 swap 都在</span>
+<span class="p">#</span> lab grade storage-swap</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-swap</pre></div>
+</div></article>
+
+<article class="ex" id="storage-stratis">
+<header><span class="name">storage-stratis</span><h3>Stratis pool, filesystem, snapshot<span class="zh">Stratis pool、檔案系統與快照</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start storage-stratis</pre>
+<p>用 nvme0n1 建 pool「stratispool」、檔案系統「stratisfs」,持久掛載 <code>/stratisvolume</code>(要加 <code>x-systemd.requires=stratisd.service</code>),最後做快照「stratissnap」。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> systemctl enable --now stratisd
+<span class="p">#</span> stratis pool create stratispool /dev/nvme0n1
+<span class="p">#</span> stratis filesystem create stratispool stratisfs
+<span class="p">#</span> mkdir -p /stratisvolume
+<span class="p">#</span> blkid /dev/stratis/stratispool/stratisfs   <span class="c"># 抄下 UUID</span>
+<span class="p">#</span> echo 'UUID=這裡貼UUID /stratisvolume xfs defaults,x-systemd.requires=stratisd.service 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> mount /stratisvolume
+<span class="p">#</span> stratis filesystem snapshot stratispool stratisfs stratissnap</pre>
+<p>Stratis 檔案系統的 fstab 類型寫 <code>xfs</code>;<code>x-systemd.requires</code> 讓 systemd 等 stratisd 起來才掛,漏了這個下次開機會卡 emergency mode。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> stratis filesystem list
+<span class="p">#</span> lab grade storage-stratis</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-stratis</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 05 ============ -->
+<section class="topic" id="t05"><h2><span class="no">05</span>network-filesystems 網路檔案系統</h2>
+
+<article class="ex" id="files-rsync">
+<header><span class="name">files-rsync</span><h3>Mirror a directory with rsync<span class="zh">rsync 鏡像到 serverb</span></h3><span class="node">servera → serverb</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start files-rsync</pre>
+<p>把 servera 的 <code>/opt/labdata</code> 精確鏡像到 serverb 的 <code>/opt/labdata-backup</code>:權限/擁有者/時間都要保留,serverb 上多出來的 obsolete.txt 要刪掉。<strong>serverb 必須開機。</strong></p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> rsync -av --delete /opt/labdata/ root@serverb:/opt/labdata-backup/
+  <span class="c"># root@serverb 密碼:student</span></pre>
+<p>三個關鍵:<code>-a</code>(archive,保留權限/擁有者/mtime)、<code>--delete</code>(刪除目的端多餘檔案)、來源結尾的「/」(複製內容而非目錄本身)。要保留擁有者,目的端須以 root 寫入,所以用 root@serverb。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> rsync -avn --delete /opt/labdata/ root@serverb:/opt/labdata-backup/
+  <span class="c"># -n 乾跑,無輸出差異即同步完成</span>
+<span class="p">#</span> lab grade files-rsync</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish files-rsync</pre></div>
+</div></article>
+
+<article class="ex" id="nfs-autofs">
+<header><span class="name">nfs-autofs</span><h3>Automount an NFS export with autofs<span class="zh">autofs 自動掛載 NFS</span></h3><span class="node">servera ← serverb</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start nfs-autofs</pre>
+<p>serverb 匯出 <code>/rhome</code>;在 servera 用 autofs「間接對映」讓 <code>/rhome/remoteuser1</code> 進入時自動掛載,不可寫 fstab。<strong>serverb 必須開機。</strong></p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> dnf -y install autofs nfs-utils
+<span class="p">#</span> echo '/rhome /etc/auto.rhome' &gt; /etc/auto.master.d/rhome.autofs
+<span class="p">#</span> echo 'remoteuser1 -rw serverb.lab.example.com:/rhome/remoteuser1' &gt; /etc/auto.rhome
+<span class="p">#</span> systemctl enable --now autofs</pre>
+<p>間接對映兩層:master 檔指定「母目錄 → 對映檔」,對映檔的 key(remoteuser1)是母目錄下的子目錄名。<code>ls /rhome</code> 平時是空的,進入 <code>/rhome/remoteuser1</code> 那一刻才觸發掛載——這是正常現象。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls /rhome/remoteuser1 &amp;&amp; findmnt /rhome/remoteuser1
+<span class="p">#</span> lab grade nfs-autofs</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish nfs-autofs</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 06 ============ -->
+<section class="topic" id="t06"><h2><span class="no">06</span>scheduling-and-services 排程與服務</h2>
+
+<article class="ex" id="sched-at">
+<header><span class="name">sched-at</span><h3>One-off job with at<span class="zh">at 一次性排程</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sched-at</pre>
+<p>以 sched1 身分排一個明天 16:00 的一次性工作,執行 <code>/usr/bin/logger "at job from the RHCSA lab"</code>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> su - sched1
+<span class="p">$</span> echo '/usr/bin/logger "at job from the RHCSA lab"' | at 16:00 tomorrow
+<span class="p">$</span> atq          <span class="c"># 確認佇列裡恰好一筆</span>
+<span class="p">$</span> exit</pre>
+<p>用管線把指令餵給 <code>at</code> 最不容易出錯;互動式輸入的話,打完指令按 Ctrl+D 結束。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> at -c 1   <span class="c"># 編號看 atq,結尾應是 logger 指令</span>
+<span class="p">#</span> lab grade sched-at</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sched-at</pre></div>
+</div></article>
+
+<article class="ex" id="sched-cron">
+<header><span class="name">sched-cron</span><h3>Recurring job for another user<span class="zh">替他人設 cron 排程</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sched-cron</pre>
+<p>讓 <code>/usr/bin/logger "EX200 in progress"</code> 以 natasha 身分每天 14:23 執行,必須放在 natasha 自己的 crontab。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> crontab -e -u natasha</pre>
+<pre class="term"><span class="c"># 在編輯器中加入這一行後存檔:</span>
+23 14 * * * /usr/bin/logger "EX200 in progress"</pre>
+<pre class="term"><span class="p">#</span> systemctl enable --now crond</pre>
+<p>五個欄位:分 時 日 月 週。「每天 14:23」= <code>23 14 * * *</code>——分在前、時在後,順序寫反是最常見的丟分點。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> crontab -l -u natasha
+<span class="p">#</span> lab grade sched-cron</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sched-cron</pre></div>
+</div></article>
+
+<article class="ex" id="sched-timer">
+<header><span class="name">sched-timer</span><h3>Recurring job with a systemd timer<span class="zh">systemd timer 週期排程</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sched-timer</pre>
+<p>建立 oneshot service 執行 <code>/usr/local/bin/labreport.sh</code>,再建 timer 每 10 分鐘觸發;enable 的對象是 timer,service 本身不可 enable。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> cat &gt; /etc/systemd/system/labreport.service &lt;&lt;'UNIT'
+[Unit]
+Description=Lab report
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/labreport.sh
+UNIT
+<span class="p">#</span> cat &gt; /etc/systemd/system/labreport.timer &lt;&lt;'UNIT'
+[Unit]
+Description=Run labreport every 10 minutes
+
+[Timer]
+OnCalendar=*:0/10
+
+[Install]
+WantedBy=timers.target
+UNIT
+<span class="p">#</span> systemctl daemon-reload
+<span class="p">#</span> systemctl enable --now labreport.timer</pre>
+<p><code>OnCalendar=*:0/10</code> = 每小時的 0,10,20…分。service 不寫 [Install] 區段、也不 enable——由 timer 驅動它。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> systemctl list-timers labreport.timer
+<span class="p">#</span> lab grade sched-timer</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sched-timer</pre></div>
+</div></article>
+
+<article class="ex" id="services-control">
+<header><span class="name">services-control</span><h3>Services and the default boot target<span class="zh">服務控制與預設開機 target</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start services-control</pre>
+<p>把預設 target 改回 multi-user;httpd 要 mask 到完全不能啟動;atd 要 enabled 且執行中。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> systemctl set-default multi-user.target
+<span class="p">#</span> systemctl mask --now httpd
+<span class="p">#</span> systemctl enable --now atd</pre>
+<p>disable 只是不隨開機啟動,仍可被手動或相依拉起;<code>mask</code> 把 unit 連到 /dev/null,才是「完全不能啟動」。<code>--now</code> 同時處理當下狀態。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> systemctl get-default; systemctl is-enabled httpd
+<span class="p">#</span> lab grade services-control</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish services-control</pre></div>
+</div></article>
+
+<article class="ex" id="services-tuned">
+<header><span class="name">services-tuned</span><h3>Select a tuning profile<span class="zh">選擇 tuned 調校 profile</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start services-tuned</pre>
+<p>安裝並啟用 tuned,把使用中 profile 設為 virtual-guest。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> dnf -y install tuned
+<span class="p">#</span> systemctl enable --now tuned
+<span class="p">#</span> tuned-adm profile virtual-guest</pre></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> tuned-adm active
+<span class="p">#</span> lab grade services-tuned</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish services-tuned</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 07 ============ -->
+<section class="topic" id="t07"><h2><span class="no">07</span>network-and-time 網路與時間</h2>
+
+<article class="ex" id="net-nmcli">
+<header><span class="name">net-nmcli</span><h3>Static IPv4 with nmcli<span class="zh">nmcli 設定靜態 IP</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start net-nmcli</pre>
+<p>在第三張網卡 enp0s9 建立 labnet 連線:靜態 172.25.250.10/24、DNS 172.25.250.254、不可搶預設路由、開機自動啟用;另讓 labserver 不經 DNS 解析為 172.25.250.11。<strong>enp0s3/enp0s8 不可動。</strong></p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> nmcli con add con-name labnet ifname enp0s9 type ethernet \
+      ipv4.method manual ipv4.addresses 172.25.250.10/24 \
+      ipv4.dns 172.25.250.254 ipv4.never-default yes \
+      connection.autoconnect yes
+<span class="p">#</span> nmcli con up labnet
+<span class="p">#</span> echo '172.25.250.11 labserver' &gt;&gt; /etc/hosts</pre>
+<p><code>ipv4.never-default yes</code> 是本題靈魂:少了它,這張隔離網卡會搶走預設路由、斷掉對外網路。「不用 DNS 解析名稱」= 寫 <code>/etc/hosts</code>。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ip -4 addr show enp0s9; getent hosts labserver
+<span class="p">#</span> lab grade net-nmcli</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish net-nmcli</pre></div>
+</div></article>
+
+<article class="ex" id="time-chrony">
+<header><span class="name">time-chrony</span><h3>Point chronyd at a time source<span class="zh">chrony 指定時間來源</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start time-chrony</pre>
+<p>讓 chronyd 以 classroom.lab.example.com(加 iburst)為唯一時間來源;其他 server/pool 行全部移除或註解。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> vi /etc/chrony.conf
+  <span class="c"># 註解掉所有既有的 pool/server 行,加上:</span>
+  <span class="c">server classroom.lab.example.com iburst</span>
+<span class="p">#</span> systemctl enable --now chronyd
+<span class="p">#</span> systemctl restart chronyd</pre>
+<p>這個主機名稱在實驗網路解析不到,所以 <code>chronyc sources</code> 看不到同步是「預期的」——本題評的是設定檔內容。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> grep -E '^(server|pool)' /etc/chrony.conf
+<span class="p">#</span> lab grade time-chrony</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish time-chrony</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 08 ============ -->
+<section class="topic" id="t08"><h2><span class="no">08</span>security 安全</h2>
+
+<article class="ex" id="sec-firewall">
+<header><span class="name">sec-firewall</span><h3>firewalld ports and services<span class="zh">firewalld 開關服務與埠</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sec-firewall</pre>
+<p>public zone:允許 http 服務與 8080/tcp、移除 cockpit、保留 ssh;全部要永久生效並立即套用。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> firewall-cmd --permanent --add-service=http
+<span class="p">#</span> firewall-cmd --permanent --add-port=8080/tcp
+<span class="p">#</span> firewall-cmd --permanent --remove-service=cockpit
+<span class="p">#</span> firewall-cmd --reload</pre>
+<p>養成習慣:每條都帶 <code>--permanent</code>,最後 <code>--reload</code> 讓永久設定變成現行設定——一次到位,runtime 與 permanent 保證一致。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> firewall-cmd --list-all
+<span class="p">#</span> lab grade sec-firewall</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sec-firewall</pre></div>
+</div></article>
+
+<article class="ex" id="sec-selinux-boolean">
+<header><span class="name">sec-selinux-boolean</span><h3>SELinux modes and booleans<span class="zh">SELinux 模式與 boolean</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sec-selinux-boolean</pre>
+<p>把 SELinux 改回 enforcing(立即+開機),並永久開啟 httpd_enable_homedirs 與 httpd_can_network_connect。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> setenforce 1
+<span class="p">#</span> vi /etc/selinux/config     <span class="c"># SELINUX=enforcing</span>
+<span class="p">#</span> setsebool -P httpd_enable_homedirs on
+<span class="p">#</span> setsebool -P httpd_can_network_connect on</pre>
+<p><code>setenforce 1</code> 只管當下、<code>/etc/selinux/config</code> 管下次開機——兩個都要。<code>setsebool -P</code> 的 -P 就是「寫入 policy、重開仍有效」。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> getenforce; getsebool -a | grep httpd_enable_homedirs
+<span class="p">#</span> lab grade sec-selinux-boolean</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sec-selinux-boolean</pre></div>
+</div></article>
+
+<article class="ex" id="sec-selinux-fix">
+<header><span class="name">sec-selinux-fix</span><h3>Diagnose and repair an SELinux denial<span class="zh">診斷並修復 SELinux 拒絕</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sec-selinux-fix</pre>
+<p>httpd 改用 <code>/lab-content</code> 當內容目錄,一切看似正確但 curl 失敗。找出原因、永久修復,SELinux 保持 enforcing。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="c"># 修復只要兩行:加 fcontext 規則、套用標籤</span>
+<span class="p">#</span> semanage fcontext -a -t httpd_sys_content_t '/lab-content(/.*)?'
+<span class="p">#</span> restorecon -Rv /lab-content
+<span class="p">#</span> curl http://localhost/lab.html
+<span class="c"># (診斷過程考試可跳過;想看原因:ls -dZ /lab-content、ausearch -m AVC -ts recent)</span></pre>
+<p>套路是「semanage fcontext 定規則(立法)+ restorecon 套標籤(執法)」。只用 <code>chcon</code> 改標籤撐不過 relabel,評分明確會抓這一點。</p>
+<div class="phase"><h4>考場自救:man 手冊查法</h4>
+<p>語法記不清時,答案就在系統裡——<code>man semanage-fcontext</code> 最底部的 EXAMPLES 段有完整可抄的範例,連 <code>(/.*)?</code> 的寫法都直接給你。查法三招:</p>
+<pre class="term"><span class="p">#</span> man semanage-fcontext    <span class="c"># 按 G 直達最底部 EXAMPLES,照抄</span>
+<span class="p">#</span> man -k semanage           <span class="c"># 忘記指令全名?關鍵字反查(= apropos)</span>
+<span class="p">#</span> man 5 fstab               <span class="c"># 「設定檔格式」都在第 5 章</span></pre>
+<p>man 括號數字 = 章節:<strong>1</strong> 一般指令、<strong>5</strong> 設定檔格式、<strong>8</strong> 管理指令。撞名時要指定章節——<code>man crontab</code> 是指令用法,<code>man 5 crontab</code> 才是五個時間欄位的格式說明。閱讀導航:<code>/字串</code> 搜尋、<code>n</code> 下一個、<code>G</code> 跳到最尾、<code>q</code> 離開。若 <code>man -k</code> 查無資料,先跑 <code>mandb</code> 重建索引。</p></div></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls -dZ /lab-content   <span class="c"># httpd_sys_content_t</span>
+<span class="p">#</span> lab grade sec-selinux-fix</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sec-selinux-fix</pre></div>
+</div></article>
+
+<article class="ex" id="sec-selinux-httpd">
+<header><span class="name">sec-selinux-httpd</span><h3>httpd on a non-standard port, enforcing<span class="zh">非標準埠 + enforcing 的 httpd</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start sec-selinux-httpd</pre>
+<p>httpd 以 <code>/web</code> 為 DocumentRoot、監聽 82 埠、頁面內容恰為「Welcome to servera」;SELinux enforcing、防火牆放行 82。這是把檔案標籤、埠標籤、防火牆全部串起來的大題。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> dnf -y install httpd
+<span class="p">#</span> mkdir -p /web &amp;&amp; echo 'Welcome to servera' &gt; /web/index.html
+<span class="p">#</span> vi /etc/httpd/conf/httpd.conf</pre>
+<pre class="term"><span class="c"># httpd.conf 改三處:</span>
+Listen 82
+DocumentRoot "/web"
+&lt;Directory "/web"&gt;
+    AllowOverride None
+    Require all granted
+&lt;/Directory&gt;</pre>
+<pre class="term"><span class="p">#</span> semanage fcontext -a -t httpd_sys_content_t '/web(/.*)?'
+<span class="p">#</span> restorecon -Rv /web
+<span class="p">#</span> semanage port -a -t http_port_t -p tcp 82
+<span class="p">#</span> firewall-cmd --permanent --add-port=82/tcp &amp;&amp; firewall-cmd --reload
+<span class="p">#</span> systemctl enable --now httpd
+<span class="p">#</span> curl http://servera:82</pre>
+<p>三道關卡缺一不可:檔案標籤(fcontext)、埠標籤(<code>semanage port</code>,否則 httpd 綁不上 82)、防火牆。忘了 <code>&lt;Directory&gt;</code> 區塊會拿到 403。</p>
+<pre class="term"><span class="c"># 語法忘了就查(EXAMPLES 在 man 頁最底部,按 G 直達):</span>
+<span class="p">#</span> man semanage-port         <span class="c"># 埠標籤範例</span>
+<span class="p">#</span> man semanage-fcontext     <span class="c"># 檔案標籤範例</span>
+<span class="p">#</span> man -k semanage            <span class="c"># 忘記子指令名,關鍵字反查</span>
+<span class="p">#</span> semanage port -l | grep http   <span class="c"># 抄現成的 http_port_t 埠清單當範本</span></pre></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> curl http://servera:82   <span class="c"># Welcome to servera</span>
+<span class="p">#</span> lab grade sec-selinux-httpd</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sec-selinux-httpd</pre></div>
+</div></article>
+
+<article class="ex" id="ssh-keyauth">
+<header><span class="name">ssh-keyauth</span><h3>SSH key-based authentication<span class="zh">SSH 金鑰認證</span></h3><span class="node">servera → serverb</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start ssh-keyauth</pre>
+<p>以 student(不是 root)產生無 passphrase 金鑰,裝到 serverb,做到 <code>ssh student@serverb hostname</code> 免密碼。<strong>serverb 必須開機。</strong></p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">$</span> ssh-keygen        <span class="c"># 路徑用預設,passphrase 兩次都直接 Enter(留空)</span>
+<span class="p">$</span> ssh-copy-id student@serverb    <span class="c"># 密碼:student</span>
+<span class="p">$</span> ssh student@serverb hostname   <span class="c"># 應直接回 serverb.lab.example.com</span></pre>
+<p><code>ssh-copy-id</code> 會自動把 .ssh 設成 700、authorized_keys 設成 600,比手動 scp 省事又不會弄錯權限。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> ssh student@serverb hostname
+<span class="p">$</span> lab grade ssh-keyauth</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">$</span> lab finish ssh-keyauth</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 09 ============ -->
+<section class="topic" id="t09"><h2><span class="no">09</span>containers 容器</h2>
+
+<article class="ex" id="podman-basic">
+<header><span class="name">podman-basic</span><h3>Rootless container, started at boot<span class="zh">rootless 容器 + 開機自啟</span></h3><span class="node">servera(需網路)</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start podman-basic</pre>
+<p>全程以 contuser(rootless)操作:拉 ubi9 映像、跑名為 labcache 的常駐容器並把 <code>~/data</code> 掛進 <code>/data</code>(:Z),最後讓它在開機時自動啟動(user unit + lingering)。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="c"># 先以 root 開啟 lingering(沒登入也能跑 user service):</span>
+<span class="p">#</span> loginctl enable-linger contuser
+<span class="c"># 切到 contuser(建議 ssh 進去,才有完整的 user session):</span>
+<span class="p">#</span> ssh contuser@localhost</pre>
+<pre class="term"><span class="p">$</span> podman pull registry.access.redhat.com/ubi9/ubi
+<span class="p">$</span> mkdir -p ~/data &amp;&amp; echo hello &gt; ~/data/report.txt
+<span class="p">$</span> podman run -d --name labcache \
+      -v /home/contuser/data:/data:Z \
+      registry.access.redhat.com/ubi9/ubi sleep infinity
+<span class="p">$</span> mkdir -p ~/.config/systemd/user &amp;&amp; cd ~/.config/systemd/user
+<span class="p">$</span> podman generate systemd --new --files --name labcache
+<span class="p">$</span> systemctl --user daemon-reload
+<span class="p">$</span> systemctl --user enable container-labcache.service</pre>
+<p>三個一定要記的零件:<code>:Z</code>(SELinux 重標記,漏掉容器讀不到目錄)、<code>podman generate systemd --new</code>(產生 user unit)、<code>loginctl enable-linger</code>(沒有它,登出後 user service 全滅)。若 <code>su - contuser</code> 進去遇到 systemctl --user 連不上,先 <code>export XDG_RUNTIME_DIR=/run/user/$(id -u)</code>。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> podman exec labcache ls /data   <span class="c"># report.txt</span>
+<span class="p">$</span> lab grade podman-basic</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">$</span> lab finish podman-basic</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="topic" id="t10"><h2><span class="no">10</span>shell-scripting Shell 腳本</h2>
+
+<article class="ex" id="script-bash">
+<header><span class="name">script-bash</span><h3>Loop, conditional and arguments<span class="zh">迴圈、條件與參數</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start script-bash</pre>
+<p>寫 <code>/usr/local/bin/userreport.sh</code>:每個參數印 <code>使用者:UID:shell</code> 或 <code>使用者:NOT FOUND</code>;無參數印 usage 並以狀態 2 結束。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> vi /usr/local/bin/userreport.sh</pre>
+<pre class="term">#!/bin/bash
+if [ $# -eq 0 ]; then
+    echo "usage: userreport.sh USER [USER...]"
+    exit 2
+fi
+for u in "$@"; do
+    if id "$u" &amp;&gt;/dev/null; then
+        echo "$u:$(id -u "$u"):$(getent passwd "$u" | cut -d: -f7)"
+    else
+        echo "$u:NOT FOUND"
+    fi
+done
+exit 0</pre>
+<pre class="term"><span class="p">#</span> chmod +x /usr/local/bin/userreport.sh</pre>
+<p>login shell 從 <code>getent passwd</code> 第 7 欄取;<code>"$@"</code> 加引號才能正確逐一處理參數。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> userreport.sh labuser1 nobody ghost; echo $?
+<span class="p">#</span> lab grade script-bash</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish script-bash</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="topic" id="t11"><h2><span class="no">11</span>processes-and-logs 程序與日誌</h2>
+
+<article class="ex" id="proc-nice">
+<header><span class="name">proc-nice</span><h3>nice and renice<span class="zh">nice 與 renice 調整優先權</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start proc-nice</pre>
+<p>把執行中的 labload 調到 nice 10(PID 不可變);再啟動第二個實例 <code>labload 88888</code>,出生即 nice 15、登出後仍在跑。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> pgrep -a labload                 <span class="c"># 找到原有程序的 PID</span>
+<span class="p">#</span> renice -n 10 -p 原PID
+<span class="p">#</span> nohup nice -n 15 /usr/local/bin/labload 88888 &amp;</pre>
+<p>已在跑的用 <code>renice</code>、新啟動的用 <code>nice -n</code> 前綴;<code>nohup … &amp;</code> 讓它脫離終端機、登出不死。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ps -o pid,ni,cmd -C labload   <span class="c"># NI 應為 10 與 15</span>
+<span class="p">#</span> lab grade proc-nice</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish proc-nice</pre></div>
+</div></article>
+
+<article class="ex" id="logs-journal">
+<header><span class="name">logs-journal</span><h3>Persistent systemd journal<span class="zh">journal 持久化</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start logs-journal</pre>
+<p>讓 journal 持久存放在 <code>/var/log/journal</code>(現在就要實際寫入),磁碟用量上限 100 MB,兩者重開機後仍有效。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> mkdir -p /etc/systemd/journald.conf.d
+<span class="p">#</span> cat &gt; /etc/systemd/journald.conf.d/persistent.conf &lt;&lt;'CONF'
+[Journal]
+Storage=persistent
+SystemMaxUse=100M
+CONF
+<span class="p">#</span> systemctl restart systemd-journald</pre>
+<p>設成 <code>Storage=persistent</code> 之後,journald 重啟時會「自己建好」/var/log/journal(含正確擁有者與權限)並開始寫入,不必手動 mkdir——這正是最省事的做法。唯一不能省的是 <code>[Journal]</code> 標頭。用 <code>journalctl --header | grep 'File path'</code> 確認已顯示 /var/log/journal;若還沒切換,補一下 <code>journalctl --flush</code>。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> journalctl --header | grep 'File path'
+<span class="p">#</span> lab grade logs-journal</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish logs-journal</pre></div>
+</div></article>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="topic" id="t12"><h2><span class="no">12</span>software + boot 套件管理與開機救援</h2>
+
+<article class="ex" id="dnf-repo">
+<header><span class="name">dnf-repo</span><h3>Enable a DNF repository<span class="zh">設定 DNF 套件庫</span></h3><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start dnf-repo</pre>
+<p>為 <code>/opt/labrepo</code> 建 repo 檔(id 恰為 labrepo、gpgcheck 開啟、指定 Rocky 10 金鑰),再從裡面裝 zsh。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> cat &gt; /etc/yum.repos.d/labrepo.repo &lt;&lt;'REPO'
+[labrepo]
+name=Local lab repository
+baseurl=file:///opt/labrepo
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+REPO
+<span class="p">#</span> dnf repolist
+<span class="p">#</span> dnf -y install zsh</pre>
+<p>gpgcheck=1 必須留著——套件本來就是有簽章的 Rocky 官方套件,驗證一定會過;關掉 gpgcheck 是評分明定的錯誤答案。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> dnf repoinfo labrepo; rpm -q zsh
+<span class="p">#</span> lab grade dnf-repo</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish dnf-repo</pre></div>
+</div></article>
+
+<article class="ex" id="boot-rescue">
+<header><span class="name">boot-rescue</span><h3>Repair an unbootable system<span class="zh">修復無法開機的系統</span></h3><span class="node">servera(需 console)</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start boot-rescue</pre>
+<p class="note">本題會「蓄意」讓下次開機失敗,而且卡住期間 SSH 連不上——必須用 VM 的 console 視窗操作。開始前先在 Windows 上把 servera 改成有畫面的模式:<br><code>VBoxManage controlvm servera poweroff</code> → <code>VBoxManage startvm servera --type separate</code></p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="c"># (console 中)重開機,看它掉進 emergency mode:</span>
+<span class="p">#</span> systemctl reboot
+<span class="c"># emergency shell 以 root 登入(密碼 student),然後:</span>
+<span class="p">#</span> mount -o remount,rw /
+<span class="p">#</span> vi /etc/fstab            <span class="c"># 刪掉指向不存在裝置的那一行</span>
+<span class="p">#</span> findmnt --verify          <span class="c"># 確認沒有其他錯誤</span>
+<span class="p">#</span> systemctl reboot          <span class="c"># 應正常開機</span></pre>
+<p>emergency mode 的根檔案系統是唯讀的,不先 remount rw 就存不了檔。原始 fstab 備份在 <code>/var/lib/rhcsa-labs/fstab.orig</code> 可比對。評分要求「修好之後真的重開過機」——別跳過最後一步。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># 正常開機後登入:</span>
+<span class="p">#</span> lab grade boot-rescue</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish boot-rescue</pre></div>
+</div></article>
+</section>
+
+<footer>
+<p>環境:VirtualBox servera / serverb(Rocky Linux 10,相容 RHEL 10)。題目雙語全文:<code>lab describe 題目名</code>;全部歸零:關機後 <code>VBoxManage snapshot servera restore lab-ready</code>(serverb 同理)。<br>
+搭配教材:<code>Downloads\RHtest-…\RHtest\RH124\LAB\html\</code> 內的章節講義。祝考試順利!<br>
+每題頂端的 5 個方塊是「練習次數紀錄」,勾選狀態儲存在你這台瀏覽器裡,重新開啟頁面仍會保留。</p>
+</footer>
+</div>
+<script>
+(function(){
+  var KEY='rhcsa-practice', store={};
+  try{ store=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
+
+  document.querySelectorAll('article.ex').forEach(function(a){
+    var id=a.id, row=document.createElement('div');
+    row.className='praxis';
+    var html='<span class="plabel">練習紀錄</span>';
+    for(var i=0;i<5;i++){
+      html+='<input type="checkbox" data-ex="'+id+'" data-i="'+i+
+            '" aria-label="'+id+' 第'+(i+1)+'次練習">';
+    }
+    html+='<span class="pcount"></span>';
+    row.innerHTML=html;
+    a.insertBefore(row, a.firstChild);
+  });
+
+  function refresh(ex){
+    var boxes=document.querySelectorAll('.praxis input[data-ex="'+ex+'"]');
+    var n=0; boxes.forEach(function(b){ if(b.checked) n++; });
+    var label=boxes[0].closest('.praxis').querySelector('.pcount');
+    label.textContent = n ? n+' / 5 次' : '';
+  }
+
+  document.querySelectorAll('.praxis input').forEach(function(cb){
+    var ex=cb.dataset.ex, i=cb.dataset.i;
+    cb.checked=!!(store[ex]&&store[ex][i]);
+    cb.addEventListener('change',function(){
+      store[ex]=store[ex]||{};
+      store[ex][i]=cb.checked;
+      try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){}
+      refresh(ex);
+    });
+  });
+  document.querySelectorAll('article.ex').forEach(function(a){ refresh(a.id); });
+
+  // 每個終端機區塊加「複製」按鈕(複製純指令,去掉提示符 $ / #)
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗';
+        if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});
+      }else{
+        var ta=document.createElement('textarea');ta.value=text;
+        ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+        var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+        document.body.removeChild(ta);done(ok);
+      }
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

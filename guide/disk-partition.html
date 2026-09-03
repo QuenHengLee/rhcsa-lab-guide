@@ -1,0 +1,367 @@
+<title>磁碟分割圖解</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F7F8F6; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --line:#DDE4DF; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:34px;font-weight:700;margin:0 0 6px}
+h2{font-size:21px;font-weight:700;margin:0 0 6px;padding-top:10px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px;letter-spacing:.05em}
+.sub{color:var(--muted);margin:0 0 8px;max-width:66ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.92em;background:var(--chip);padding:1px 6px;border-radius:4px}
+section{margin-top:52px;border-top:2px solid var(--accent);padding-top:12px}
+figure{margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 18px 12px;overflow-x:auto}
+figure svg{display:block;max-width:100%;height:auto;margin:0 auto}
+figcaption{font-size:13.5px;color:var(--muted);margin-top:10px;max-width:72ch;line-height:1.7}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;
+  padding:14px 16px;margin:12px 0;overflow-x:auto;
+  font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px;max-width:72ch}
+.note code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;margin:14px 0;font-size:14.5px;min-width:60%}
+th,td{border:1px solid var(--line);padding:7px 13px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+td code{white-space:nowrap}
+.tablebox{overflow-x:auto}
+/* fstab anatomy */
+.fstab{background:var(--term-bg);border-radius:8px;padding:18px 16px 8px;margin:14px 0;overflow-x:auto}
+.fstab .row{font:600 14px/1.5 "IBM Plex Mono",Consolas,monospace;white-space:nowrap}
+.fstab .f{display:inline-block;margin-right:14px}
+.fstab .f b{display:block;color:var(--term-ink);font-weight:600}
+.fstab .f i{display:block;font:400 11px/1.6 "Noto Sans TC",sans-serif;font-style:normal;
+  color:var(--term-prompt);border-top:1px dashed #3A4A42;margin-top:6px;padding-top:4px}
+.dev{font-family:"IBM Plex Mono",monospace;font-size:15px;background:var(--card);
+  border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:10px 0;overflow-x:auto;white-space:nowrap}
+.dev b{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 複製按鈕 */
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;
+  color:var(--term-ink);background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · storage 章節 · servera 練習環境對照</p>
+<h1>磁碟分割圖解</h1>
+<p class="sub">一顆空白磁碟要變成可以放檔案的目錄,固定經過五層轉換;LVM 則是在分割區之上再疊一層「積木池」。這頁把每個機制畫出來,並對應到你 VM 裡的 storage 練習題與指令。</p>
+
+<!-- ================= 1 ================= -->
+<section>
+<h2><span class="no">1</span>大局:從磁碟到可用目錄的五層</h2>
+<p class="sub">每一層之間的轉換,就是一個指令——把這張圖背起來,storage 題就是照著箭頭打字。</p>
+<figure>
+<svg viewBox="0 0 860 170" role="img" aria-label="五層流程:實體磁碟經 parted 建立分割表與分割區,經 mkfs 建立檔案系統,經 mount 與 fstab 掛載成目錄">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.4">
+<rect x="16"  y="52" width="128" height="62" rx="8"/>
+<rect x="188" y="52" width="128" height="62" rx="8"/>
+<rect x="360" y="52" width="128" height="62" rx="8"/>
+<rect x="532" y="52" width="128" height="62" rx="8"/>
+<rect x="704" y="52" width="128" height="62" rx="8" stroke="#0E7C5B" stroke-width="2.2"/>
+<line x1="144" y1="83" x2="182" y2="83" marker-end="url(#ar)"/>
+<line x1="316" y1="83" x2="354" y2="83" marker-end="url(#ar)"/>
+<line x1="488" y1="83" x2="526" y2="83" marker-end="url(#ar)"/>
+<line x1="660" y1="83" x2="698" y2="83" marker-end="url(#ar)"/>
+</g>
+<g fill="currentColor" text-anchor="middle" font-family="Noto Sans TC,sans-serif">
+<text x="80"  y="78" font-size="13" font-weight="600">實體磁碟</text>
+<text x="80"  y="98" font-size="11" font-family="IBM Plex Mono,monospace">/dev/nvme0n1</text>
+<text x="252" y="78" font-size="13" font-weight="600">分割表</text>
+<text x="252" y="98" font-size="11">GPT 或 MBR</text>
+<text x="424" y="78" font-size="13" font-weight="600">分割區</text>
+<text x="424" y="98" font-size="11" font-family="IBM Plex Mono,monospace">nvme0n1p1</text>
+<text x="596" y="78" font-size="13" font-weight="600">檔案系統</text>
+<text x="596" y="98" font-size="11">XFS / ext4 / swap</text>
+<text x="768" y="78" font-size="13" font-weight="600" fill="#0E7C5B">掛載點</text>
+<text x="768" y="98" font-size="11" font-family="IBM Plex Mono,monospace" fill="#0E7C5B">/mnt/data</text>
+</g>
+<g fill="#0E7C5B" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11">
+<text x="163" y="40">parted</text><text x="163" y="132">mklabel gpt</text>
+<text x="335" y="40">parted</text><text x="335" y="132">mkpart</text>
+<text x="507" y="40">mkfs.xfs</text>
+<text x="679" y="40">mount</text><text x="679" y="132">+ fstab</text>
+</g>
+</svg>
+<figcaption>五層流程與轉換指令。前四層做完只是「有了檔案系統」,最後一層掛載才讓它出現在目錄樹裡——而且要寫進 <code>/etc/fstab</code> 才能在重開機後自動回來。對應練習:<code>storage-partition</code>。</figcaption>
+</figure>
+<pre class="term"><span class="p">#</span> lsblk        <span class="c"># 隨時查看目前這五層的狀態(樹狀:磁碟→分割區→掛載點)</span>
+<span class="p">#</span> blkid        <span class="c"># 查每個檔案系統的 UUID 與類型</span></pre>
+</section>
+
+<!-- ================= 2 ================= -->
+<section>
+<h2><span class="no">2</span>裝置名稱怎麼讀</h2>
+<div class="dev">/dev/<b>sd</b> <b>a</b> <b>2</b> &nbsp;&nbsp;→&nbsp; <b>sd</b>=SATA/SCSI 磁碟&nbsp;&nbsp;<b>a</b>=第 1 顆(b=第 2 顆…)&nbsp;&nbsp;<b>2</b>=第 2 個分割區</div>
+<div class="dev">/dev/<b>vd</b> <b>b</b> <b>1</b> &nbsp;&nbsp;→&nbsp; <b>vd</b>=virtio 磁碟(KVM 虛擬機=<b>真實考試環境</b>)&nbsp;&nbsp;<b>b</b>=第 2 顆&nbsp;&nbsp;<b>1</b>=第 1 個分割區</div>
+<div class="dev">/dev/<b>nvme0</b> <b>n1</b> <b>p1</b> → <b>nvme0</b>=第 1 個 NVMe 控制器&nbsp;&nbsp;<b>n1</b>=第 1 顆碟&nbsp;&nbsp;<b>p1</b>=第 1 個分割區</div>
+<p class="note">規則:裝置名以「數字」結尾時(nvme0n1、mmcblk0),分割區編號前要加 <code>p</code>——所以是 <code>nvme0n1p1</code> 而不是 nvme0n11。以字母結尾的(sda、vdb)直接接數字:<code>sda1</code>、<code>vdb1</code>。你的練習碟是 NVMe 命名(<code>/dev/nvme0n1</code>、<code>/dev/nvme0n2</code>),<strong>真實考試是 KVM 虛擬機,練習碟通常叫 <code>/dev/vdb</code></strong>——名字不用背,進場先 <code>lsblk</code>,哪顆是空碟一目了然。系統碟(這裡是 sda,考場是 vda)永遠不要碰。</p>
+</section>
+
+<!-- ================= 3 ================= -->
+<section>
+<h2><span class="no">3</span>分割表:MBR vs GPT</h2>
+<p class="sub">分割表是磁碟開頭的一張「目錄」,記錄每個分割區從哪裡開始、到哪裡結束。兩種格式的差別決定了你能切幾塊、能用多大。</p>
+<figure>
+<svg viewBox="0 0 860 250" role="img" aria-label="MBR 與 GPT 磁碟佈局對比:MBR 只有開頭一份表、最多四個主分割;GPT 有 128 個位置且磁碟尾端多一份備份表">
+<g font-family="Noto Sans TC,sans-serif" fill="currentColor">
+<text x="16" y="34" font-size="13" font-weight="600">MBR</text>
+<text x="16" y="52" font-size="11" fill="currentColor" opacity=".65">(msdos)</text>
+</g>
+<g stroke="currentColor" stroke-width="1.4">
+<rect x="90" y="20" width="34" height="44" fill="currentColor" opacity=".8"/>
+<rect x="124" y="20" width="176" height="44" fill="none"/>
+<rect x="300" y="20" width="176" height="44" fill="none"/>
+<rect x="476" y="20" width="176" height="44" fill="none"/>
+<rect x="652" y="20" width="176" height="44" fill="none"/>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="12" fill="currentColor" text-anchor="middle">
+<text x="212" y="47">主分割 1</text><text x="388" y="47">主分割 2</text>
+<text x="564" y="47">主分割 3</text><text x="740" y="47">主分割 4</text>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="11" fill="currentColor" opacity=".75">
+<text x="90" y="82">↑ 表只有開頭這一份,壞了就全毀</text>
+<text x="560" y="82">最多 4 個主分割 · 磁碟上限 2 TiB</text>
+</g>
+
+<g font-family="Noto Sans TC,sans-serif" fill="currentColor">
+<text x="16" y="148" font-size="13" font-weight="600">GPT</text>
+<text x="16" y="166" font-size="11" opacity=".65">(建議)</text>
+</g>
+<g stroke="currentColor" stroke-width="1.4">
+<rect x="90"  y="134" width="18" height="44" fill="currentColor" opacity=".35"/>
+<rect x="108" y="134" width="56" height="44" fill="#DCEDE5" stroke="#0E7C5B"/>
+<rect x="164" y="134" width="150" height="44" fill="none"/>
+<rect x="314" y="134" width="150" height="44" fill="none"/>
+<rect x="464" y="134" width="150" height="44" fill="none"/>
+<rect x="614" y="134" width="150" height="44" fill="none" stroke-dasharray="5 4"/>
+<rect x="772" y="134" width="56" height="44" fill="#DCEDE5" stroke="#0E7C5B" stroke-width="2.2"/>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="12" fill="currentColor" text-anchor="middle">
+<text x="136" y="153" font-size="10" fill="#0A5C44">GPT</text>
+<text x="136" y="166" font-size="10" fill="#0A5C44">標頭+表</text>
+<text x="239" y="161">分割 1</text><text x="389" y="161">分割 2</text><text x="539" y="161">分割 3</text>
+<text x="689" y="161" opacity=".7">… 128 個</text>
+<text x="800" y="153" font-size="10" fill="#0A5C44">備份</text>
+<text x="800" y="166" font-size="10" fill="#0A5C44">GPT 表</text>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="11" fill="currentColor" opacity=".75">
+<text x="90" y="196">↑ 前 18px 是保護性 MBR(讓舊工具知道這碟有主)</text>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="11" fill="#0A5C44">
+<text x="620" y="196">↑ 尾端多一份備份表,開頭壞了可救回</text>
+</g>
+</g>
+</svg>
+<figcaption>兩者的關鍵差異:GPT 允許 128 個分割(MBR 只有 4 個主分割,要更多得犧牲一格做延伸分割)、支援 2 TiB 以上的磁碟,而且在磁碟尾端保有一份<strong>備份分割表</strong>(綠色)——這是 MBR 沒有的保命機制。新磁碟一律用 GPT:<code>parted /dev/nvme0n1 mklabel gpt</code>。</figcaption>
+</figure>
+<div class="tablebox"><table>
+<tr><th></th><th>MBR (msdos)</th><th>GPT</th></tr>
+<tr><td>分割數量</td><td>4 個主分割(3 主 + 1 延伸可再切邏輯分割)</td><td>128 個,無主/延伸之分</td></tr>
+<tr><td>磁碟大小上限</td><td>2 TiB</td><td>8 ZiB(實務上無上限)</td></tr>
+<tr><td>分割表備份</td><td>無</td><td>磁碟尾端有備份</td></tr>
+<tr><td>建立指令</td><td><code>parted ... mklabel msdos</code></td><td><code>parted ... mklabel gpt</code></td></tr>
+</table></div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section>
+<h2><span class="no">4</span>檔案系統:分割區裡的收納規則</h2>
+<p class="sub">分割區只是「一段原始空間」,還不能放檔案。檔案系統(file system)是把這段空間組織起來的規則:哪裡放資料、哪裡放索引(檔名、權限、擁有者、時間戳都記在這)。<code>mkfs</code> = <b>m</b>a<b>k</b>e <b>f</b>ile<b>s</b>ystem,就是把這套規則「鋪」到分割區上——所以又叫格式化,會清掉原有內容。</p>
+<div class="tablebox"><table>
+<tr><th></th><th>XFS</th><th>ext4</th><th>VFAT</th></tr>
+<tr><td>定位</td><td><strong>RHEL 預設</strong>,大檔與平行 I/O 強</td><td>Linux 傳統通用格式</td><td>跨平台交換格式(隨身碟、EFI 分割區)</td></tr>
+<tr><td>建立</td><td><code>mkfs.xfs /dev/vdb1</code></td><td><code>mkfs.ext4 /dev/vdb1</code></td><td><code>mkfs.vfat /dev/vdb1</code></td></tr>
+<tr><td>線上放大</td><td><code>xfs_growfs 掛載點</code></td><td><code>resize2fs 裝置</code></td><td>—</td></tr>
+<tr><td>縮小</td><td><strong>不行!只能放大</strong></td><td>可以(需先卸載)</td><td>—</td></tr>
+<tr><td>Linux 權限/擁有者</td><td>支援</td><td>支援</td><td><strong>不支援</strong>(無 chmod/chown 概念)</td></tr>
+<tr><td>fstab 類型欄寫</td><td><code>xfs</code></td><td><code>ext4</code></td><td><code>vfat</code></td></tr>
+</table></div>
+<pre class="term"><span class="p">#</span> lsblk -f        <span class="c"># 每個分割區用的檔案系統+UUID+掛載點,一眼看完</span>
+<span class="p">#</span> mkfs.xfs -f /dev/vdb1   <span class="c"># -f:分割區上已有舊檔案系統時強制覆蓋</span></pre>
+<p class="note">考場原則:<strong>題目指定什麼就 mkfs 什麼</strong>,別自作主張(你朋友那份考題就明確考了 ext4/xfs)。兩個好搭配 <code>lvextend</code> 記的點:<code>-r</code> 會自動挑對放大工具(XFS 用 xfs_growfs、ext4 用 resize2fs),所以擴充題一律 <code>lvextend -r</code> 最省事;以及 <strong>XFS 沒有縮小這條路</strong>——題目若真要縮小,那一定不是 XFS。</p>
+</section>
+
+<!-- ================= 5 ================= -->
+<section>
+<h2><span class="no">5</span>掛載:目錄是通往磁碟的門</h2>
+<p class="sub">「掛載」= 把檔案系統的內容接到目錄樹的某個目錄底下,那個目錄就成了通往這顆碟的<strong>門</strong>。掛載前後的差別:</p>
+<pre class="term"><span class="c">掛載前:                            掛載後:</span>
+/                                   /
+├── etc/    <span class="c">← 都在系統碟</span>          ├── etc/       <span class="c">← 還是系統碟</span>
+└── mnt/                            └── mnt/
+    └── data/  <span class="c">← 只是個空目錄</span>          └── data/  <span class="c">← 這裡面的一切</span>
+                                                <span class="c">   實際存在 vdb1 上!</span></pre>
+<p class="sub">由此推出的性質:掛載點目錄要<strong>先存在</strong>(所以流程裡永遠有 <code>mkdir</code>);掛哪個目錄是你決定的,目錄名沒有魔法;<code>umount</code> 只是關門,碟上的檔案不會消失;同一個目錄同時只能掛一個檔案系統。查詢對照:</p>
+<pre class="term"><span class="p">#</span> findmnt /mnt/data    <span class="c"># 問單點:這個目錄背後是哪顆碟?</span>
+<span class="p">#</span> df -h                <span class="c"># 看全局:每個掛載點的容量與用量</span>
+<span class="p">#</span> lsblk                <span class="c"># 看全局:每顆碟/分割區掛在哪(最右欄 MOUNTPOINTS)</span></pre>
+<p class="sub">不過 <code>mount</code> 指令的效果只到關機為止;要讓掛載「跟著系統」,必須寫進 <code>/etc/fstab</code>——開機時 systemd 照這份清單把每扇門重新打開。一行六個欄位:</p>
+<div class="fstab">
+<div class="row">
+<span class="f"><b>UUID=3f5e02a1-…</b><i>① 掛什麼:用 UUID<br>指認檔案系統</i></span>
+<span class="f"><b>/mnt/data</b><i>② 掛到哪:掛載點<br>(目錄要先存在)</i></span>
+<span class="f"><b>xfs</b><i>③ 檔案系統類型<br>swap 分割寫 swap</i></span>
+<span class="f"><b>defaults</b><i>④ 掛載選項<br>逗號分隔可加料</i></span>
+<span class="f"><b>0</b><i>⑤ dump 備份<br>一律 0</i></span>
+<span class="f"><b>0</b><i>⑥ fsck 順序<br>XFS 一律 0</i></span>
+</div>
+</div>
+<p class="sub">為什麼堅持用 UUID 而不是 <code>/dev/nvme0n1p1</code>?因為裝置名稱是「開機時依偵測順序發的號碼牌」——加一顆碟、換個插槽,名字就可能全部位移,fstab 裡的舊名字會指到錯的分割區。UUID 是格式化時燒進檔案系統裡的身分證,永遠不變。</p>
+<pre class="term"><span class="p">#</span> blkid /dev/nvme0n1p1                                <span class="c"># 抄 UUID</span>
+<span class="p">#</span> echo 'UUID=貼這裡 /mnt/data xfs defaults 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> mount -a                                             <span class="c"># 立刻依 fstab 掛載 = 順便驗證寫對了</span>
+<span class="p">#</span> findmnt /mnt/data                                    <span class="c"># 確認真的掛上</span></pre>
+<p class="note"><strong>fstab 打錯字 = 下次開不了機</strong>(系統會卡在 emergency mode,也就是 <code>boot-rescue</code> 那題的劇情)。所以鐵律:改完 fstab,<strong>一定先 <code>mount -a</code> 或 <code>findmnt --verify</code> 驗過</strong>再收工。欄位格式忘了就 <code>man 5 fstab</code>。</p>
+</section>
+
+<!-- ================= 6 ================= -->
+<section>
+<h2><span class="no">6</span>LVM:把磁碟變成積木池</h2>
+<p class="sub">傳統分割區的大小切下去就難改;LVM 在分割區之上加一層抽象——把空間打碎成固定大小的積木(PE),要多大就數幾塊給你,之後還能追加。三個名詞:</p>
+<div class="tablebox"><table>
+<tr><th>層</th><th>全名</th><th>是什麼</th><th>指令家族</th></tr>
+<tr><td><b>PV</b></td><td>Physical Volume</td><td>交給 LVM 管的分割區(原料)</td><td><code>pvcreate</code> / <code>pvs</code></td></tr>
+<tr><td><b>VG</b></td><td>Volume Group</td><td>多個 PV 合成的大池子,切成等大的 <b>PE</b>(Physical Extent)積木</td><td><code>vgcreate -s</code> / <code>vgs</code></td></tr>
+<tr><td><b>LV</b></td><td>Logical Volume</td><td>從池子撥出若干 PE 組成的「邏輯分割區」,其上照常 mkfs + 掛載</td><td><code>lvcreate</code> / <code>lvs</code> / <code>lvextend</code></td></tr>
+</table></div>
+<figure>
+<svg viewBox="0 0 860 420" role="img" aria-label="LVM 機制:兩個 PV 的空間被打碎成 PE 積木匯入 VG 池,lvcreate 從池中撥出 PE 組成 LV,lvextend 再從空閒 PE 追加">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0E7C5B"/></marker></defs>
+
+<!-- LV top -->
+<g stroke="#0E7C5B" fill="#DCEDE5" stroke-width="2">
+<rect x="240" y="20" width="380" height="56" rx="8"/>
+</g>
+<g font-family="Noto Sans TC,sans-serif" text-anchor="middle" fill="#0A5C44">
+<text x="430" y="44" font-size="13" font-weight="600">LV wshare = 100 個 PE(8 MiB × 100 = 800 MiB)</text>
+<text x="430" y="62" font-size="11" font-family="IBM Plex Mono,monospace">→ mkfs.vfat → mount /mnt/wshare</text>
+</g>
+
+<!-- arrow VG->LV -->
+<line x1="430" y1="130" x2="430" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+<text x="444" y="112" font-size="11" font-family="IBM Plex Mono,monospace" fill="currentColor">lvcreate -l 100 -n wshare wgroup</text>
+
+<!-- VG pool -->
+<g stroke="currentColor" fill="none" stroke-width="1.4">
+<rect x="120" y="136" width="620" height="120" rx="10"/>
+</g>
+<text x="136" y="160" font-size="12" font-weight="600" font-family="Noto Sans TC,sans-serif" fill="currentColor">VG wgroup — PE 池(vgcreate -s 8M → 每塊積木 8 MiB)</text>
+<!-- allocated PEs -->
+<g fill="#0E7C5B">
+<rect x="140" y="176" width="30" height="30" rx="4"/><rect x="178" y="176" width="30" height="30" rx="4"/>
+<rect x="216" y="176" width="30" height="30" rx="4"/><rect x="254" y="176" width="30" height="30" rx="4"/>
+<rect x="292" y="176" width="30" height="30" rx="4"/><rect x="330" y="176" width="30" height="30" rx="4"/>
+<rect x="368" y="176" width="30" height="30" rx="4"/><rect x="406" y="176" width="30" height="30" rx="4"/>
+</g>
+<text x="452" y="197" font-size="12" fill="#0A5C44" font-family="Noto Sans TC,sans-serif">…已撥給 LV</text>
+<!-- free PEs -->
+<g fill="none" stroke="currentColor" stroke-dasharray="4 3" stroke-width="1.3">
+<rect x="546" y="176" width="30" height="30" rx="4"/><rect x="584" y="176" width="30" height="30" rx="4"/>
+<rect x="622" y="176" width="30" height="30" rx="4"/><rect x="660" y="176" width="30" height="30" rx="4"/>
+</g>
+<text x="546" y="230" font-size="11" fill="currentColor" opacity=".75" font-family="Noto Sans TC,sans-serif">空閒 PE(還沒分配)</text>
+
+<!-- lvextend arrow -->
+<path d="M 640 172 C 660 120 600 96 622 80" fill="none" stroke="#0E7C5B" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#ar3)"/>
+<text x="672" y="120" font-size="11" fill="#0A5C44" font-family="Noto Sans TC,sans-serif">lvextend -r:</text>
+<text x="672" y="136" font-size="11" fill="#0A5C44" font-family="Noto Sans TC,sans-serif">從空閒 PE 追加,</text>
+<text x="672" y="152" font-size="11" fill="#0A5C44" font-family="Noto Sans TC,sans-serif">LV 線上長大</text>
+
+<!-- arrows PV->VG -->
+<line x1="260" y1="312" x2="260" y2="262" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+<line x1="600" y1="312" x2="600" y2="262" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar2)"/>
+<text x="430" y="292" font-size="11" font-family="IBM Plex Mono,monospace" fill="currentColor" text-anchor="middle">pvcreate → vgcreate wgroup /dev/nvme0n1p1 ...</text>
+
+<!-- PVs bottom -->
+<g stroke="currentColor" fill="none" stroke-width="1.4">
+<rect x="140" y="318" width="240" height="72" rx="8"/>
+<rect x="480" y="318" width="240" height="72" rx="8"/>
+</g>
+<g font-family="IBM Plex Mono,monospace" font-size="12" fill="currentColor" text-anchor="middle">
+<text x="260" y="342">PV /dev/nvme0n1p1</text>
+<text x="600" y="342">PV /dev/nvme0n2p1</text>
+</g>
+<g font-family="Noto Sans TC,sans-serif" font-size="11" fill="currentColor" opacity=".75" text-anchor="middle">
+<text x="260" y="372">空間被打碎成 PE 匯入池子</text>
+<text x="600" y="372">跨碟也沒關係——池子不分來源</text>
+</g>
+</svg>
+<figcaption>LVM 的核心機制:VG 是一池等大的 PE 積木(<code>-s 8M</code> 決定每塊大小),LV 只是「從池子裡數 100 塊給你」(<code>-l 100</code>,小寫 l = 用積木數計量)。因為池子不在乎積木來自哪顆碟,所以 LV 可以跨碟、可以事後追加——<code>lvextend -r</code>(綠色虛線)就是把空閒積木撥進去並順手放大檔案系統。對應練習:<code>storage-lvm</code>、<code>storage-lvm-extend</code>。</figcaption>
+</figure>
+<pre class="term"><span class="c"># 三層各有查詢指令,考場隨時確認狀態:</span>
+<span class="p">#</span> pvs ; vgs ; lvs
+<span class="p">#</span> vgdisplay wgroup | grep 'PE Size'    <span class="c"># 驗證積木大小</span></pre>
+<p class="note">易混選項:<code>lvcreate <strong>-l</strong> 100</code>(小寫)= 100 個 <strong>extents</strong>;<code>lvcreate <strong>-L</strong> 800M</code>(大寫)= 800 MiB 容量。題目說「以 extents 指定」就必須用小寫 <code>-l</code>——這是 storage-lvm 評分明抓的點。</p>
+</section>
+
+<!-- ================= 7 ================= -->
+<section>
+<h2><span class="no">7</span>swap:不掛目錄的特殊分割</h2>
+<p class="sub">swap 是記憶體的「溢流區」,它走同一套五層流程,但第 4、5 層換了指令:格式化用 <code>mkswap</code>(不是 mkfs)、啟用用 <code>swapon</code>(不是 mount)、fstab 的掛載點欄寫 <code>none</code>、類型欄寫 <code>swap</code>。</p>
+<pre class="term"><span class="p">#</span> mkswap /dev/nvme0n2p1                       <span class="c"># 格式化(輸出會印 UUID)</span>
+<span class="p">#</span> echo 'UUID=貼這裡 none swap defaults 0 0' &gt;&gt; /etc/fstab
+<span class="p">#</span> swapon -a &amp;&amp; swapon --show                   <span class="c"># 依 fstab 啟用並確認</span></pre>
+<p class="sub">對應練習:<code>storage-swap</code>。</p>
+</section>
+
+<!-- ================= 8 ================= -->
+<section>
+<h2><span class="no">8</span>指令總覽 × 練習對照</h2>
+<div class="tablebox"><table>
+<tr><th>階段</th><th>指令</th><th>對應練習</th></tr>
+<tr><td>觀察現況</td><td><code>lsblk</code>、<code>blkid</code>、<code>findmnt</code>、<code>df -h</code></td><td>(每題都用)</td></tr>
+<tr><td>建分割表/分割區</td><td><code>parted /dev/nvme0n1 mklabel gpt</code> → <code>parted /dev/nvme0n1 mkpart ...</code>(或互動式 <code>fdisk</code>)</td><td>storage-partition</td></tr>
+<tr><td>建檔案系統</td><td><code>mkfs.xfs</code>、<code>mkfs.ext4</code>、<code>mkfs.vfat</code>、<code>mkswap</code></td><td>storage-partition / swap</td></tr>
+<tr><td>持久掛載</td><td>fstab(UUID)+ <code>mount -a</code> + <code>findmnt --verify</code></td><td>storage 全系列</td></tr>
+<tr><td>LVM 三層</td><td><code>pvcreate</code> → <code>vgcreate -s</code> → <code>lvcreate -l/-L</code> → <code>lvextend -r</code></td><td>storage-lvm / lvm-extend</td></tr>
+<tr><td>新一代儲存池</td><td><code>stratis pool/filesystem/snapshot</code>(概念類似 LVM,操作更簡)</td><td>storage-stratis</td></tr>
+</table></div>
+<p class="note">考場動線建議:<code>lsblk</code> 看清現況 → 動手做 → 每完成一層就 <code>lsblk</code> 再看一次(分割出現了嗎?FSTYPE 對嗎?MOUNTPOINTS 掛了嗎?)——這個「做一步、看一步」的節奏能把錯誤攔在當層,不會做到最後才發現第一步就切錯碟。</p>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗';
+        if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});
+      }else{
+        var ta=document.createElement('textarea');ta.value=text;
+        ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+        var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+        document.body.removeChild(ta);done(ok);
+      }
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

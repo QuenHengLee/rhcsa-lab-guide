@@ -1,0 +1,150 @@
+# shellcheck shell=bash
+LAB_TITLE="Rootless container with persistent storage, started at boot"
+LAB_TOPIC="09 containers"
+LAB_NODE="servera"
+
+LAB_U=contuser
+LAB_IMAGE=registry.access.redhat.com/ubi9/ubi
+LAB_CTR=labcache
+LAB_DATA=/home/contuser/data
+
+lab_describe() {
+    cat <<'EOF'
+  The user contuser already exists. Everything below is done as contuser,
+  rootless - not as root. (This exercise pulls an image, so servera needs
+  working internet access.)
+
+    1. Pull the image registry.access.redhat.com/ubi9/ubi
+
+    2. Create the directory /home/contuser/data and put a file called
+       report.txt in it.
+
+    3. Run a container named "labcache" from that image which keeps
+       running (for example "sleep infinity"), with /home/contuser/data
+       bind-mounted inside the container at /data. Remember the :Z suffix
+       so SELinux relabels the directory for container access.
+
+    4. Make the container start automatically when servera boots, even
+       though contuser is not logged in. That means a systemd *user*
+       unit plus lingering enabled for contuser.
+
+  Hint: "podman generate systemd" or a Quadlet .container file both work,
+  and "loginctl enable-linger contuser" is what allows a user service to
+  run without an active login session.
+
+  ----- 中文說明 -----
+
+  使用者 contuser 已存在。以下所有操作都以 contuser 身分、rootless
+  進行——不是 root。(本題需要拉取 image,所以 servera 要有可用的
+  網際網路連線。)
+
+    1. 拉取 image registry.access.redhat.com/ubi9/ubi
+
+    2. 建立目錄 /home/contuser/data,在裡面放一個檔案 report.txt。
+
+    3. 用該 image 執行一個名為「labcache」、會持續運作的容器
+       (例如 "sleep infinity"),並把 /home/contuser/data
+       bind-mount 到容器內的 /data。記得加 :Z 後綴,讓 SELinux
+       重新標記目錄供容器存取。
+
+    4. 讓這個容器在 servera 開機時自動啟動,即使 contuser 沒有登入
+       也一樣。也就是需要 systemd 的「user」unit,再加上為 contuser
+       啟用 lingering。
+
+  提示:「podman generate systemd」或 Quadlet 的 .container 檔都可行,
+  而「loginctl enable-linger contuser」正是讓 user service 在沒有
+  登入工作階段時也能執行的關鍵。
+EOF
+}
+
+# Rootless podman needs a login environment and XDG_RUNTIME_DIR, so go through
+# a login shell rather than `runuser -u`. Arguments are requoted so that
+# things like --format '{{.Names}}' survive the trip through the shell.
+_as_user() {
+    local uid cmd
+    uid=$(id -u "$LAB_U" 2>/dev/null) || return 1
+    cmd=$(printf '%q ' "$@")
+    runuser -l "$LAB_U" -c "export XDG_RUNTIME_DIR=/run/user/$uid; $cmd"
+}
+
+_image_present() {
+    _as_user podman images --format '{{.Repository}}' 2>/dev/null | grep -q 'ubi9/ubi'
+}
+
+_ctr_exists() {
+    _as_user podman ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$LAB_CTR"
+}
+
+_ctr_running() {
+    _as_user podman ps --format '{{.Names}}' 2>/dev/null | grep -qx "$LAB_CTR"
+}
+
+_bind_mount_ok() {
+    _as_user podman inspect "$LAB_CTR" \
+        --format '{{range .Mounts}}{{.Source}}::{{.Destination}} {{end}}' 2>/dev/null \
+        | grep -q "$LAB_DATA::/data"
+}
+
+_data_visible() {
+    _as_user podman exec "$LAB_CTR" ls /data 2>/dev/null | grep -q 'report.txt'
+}
+
+_linger_on() {
+    [ "$(loginctl show-user "$LAB_U" --property=Linger --value 2>/dev/null)" = yes ]
+}
+
+# Either the classic "podman generate systemd" unit or a Quadlet file counts.
+_boot_unit() {
+    local home
+    home=$(getent passwd "$LAB_U" | cut -d: -f6)
+    if grep -rqs -e podman -e "$LAB_CTR" "$home/.config/systemd/user/" 2>/dev/null; then
+        ls "$home/.config/systemd/user/default.target.wants/" >/dev/null 2>&1 &&
+        [ -n "$(ls -A "$home/.config/systemd/user/default.target.wants/" 2>/dev/null)" ] && return 0
+    fi
+    ls "$home"/.config/containers/systemd/*.container >/dev/null 2>&1
+}
+
+lab_setup() {
+    lab_ensure_pkg podman
+
+    if ! id "$LAB_U" >/dev/null 2>&1; then
+        useradd -m "$LAB_U" || return 1
+        echo 'Redhat123!' | passwd --stdin "$LAB_U" >/dev/null 2>&1
+    fi
+
+    loginctl disable-linger "$LAB_U" >/dev/null 2>&1
+    _as_user podman rm -f "$LAB_CTR" >/dev/null 2>&1
+    rm -rf "$LAB_DATA"
+    local home
+    home=$(getent passwd "$LAB_U" | cut -d: -f6)
+    rm -rf "$home/.config/systemd/user" "$home/.config/containers/systemd"
+    return 0
+}
+
+lab_grade() {
+    grade_check "podman is installed" 'rpm -q podman'
+    grade_check "the user contuser exists" 'id contuser'
+    grade_test "the ubi9/ubi image is in contuser's own image store" _image_present
+    grade_check "/home/contuser/data/report.txt exists" \
+        '[ -f /home/contuser/data/report.txt ]'
+    grade_test "a container named labcache exists" _ctr_exists
+    grade_test "the container is running" _ctr_running
+    grade_test "/home/contuser/data is bind-mounted at /data inside it" _bind_mount_ok
+    grade_test "report.txt is visible from inside the container" _data_visible
+    grade_test "lingering is enabled for contuser" _linger_on
+    grade_test "a systemd user unit starts the container at boot" _boot_unit
+}
+
+lab_finish() {
+    # contuser is deliberately kept. Deleting the account would also delete
+    # its container image store, forcing a fresh multi-hundred-megabyte pull
+    # on the next attempt. Everything the exercise actually created - the
+    # container, the data directory, the unit and the linger setting - goes.
+    local home
+    home=$(getent passwd "$LAB_U" 2>/dev/null | cut -d: -f6)
+    _as_user podman rm -f "$LAB_CTR" >/dev/null 2>&1
+    loginctl disable-linger "$LAB_U" >/dev/null 2>&1
+    [ -n "$home" ] && rm -rf "$home/.config/systemd/user" "$home/.config/containers/systemd"
+    rm -rf "$LAB_DATA"
+    return 0
+}

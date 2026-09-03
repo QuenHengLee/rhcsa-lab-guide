@@ -1,0 +1,87 @@
+# shellcheck shell=bash
+# Source: RH134 ch.6.2 "Operate SELinux" and ch.6.6 "Tune the SELinux Policy by
+# Adjusting Booleans"
+LAB_TITLE="SELinux modes and policy booleans"
+LAB_TOPIC="08 security"
+LAB_NODE="servera"
+
+lab_describe() {
+    cat <<'EOF'
+  Somebody has put this system into permissive mode and left the web
+  server policy at its defaults.
+
+    1. Put SELinux back into ENFORCING mode, both right now and for
+       every future boot.
+
+    2. Turn on the boolean that lets httpd serve content out of users'
+       home directories:   httpd_enable_homedirs
+
+    3. Turn on the boolean that lets httpd make outbound network
+       connections:        httpd_can_network_connect
+
+  Both booleans must stay on after a reboot - a change that only applies
+  to the running system will not pass. Check with
+
+      getsebool -a | grep httpd
+      semanage boolean -l | grep httpd_enable_homedirs
+
+  ----- 中文說明 -----
+
+  有人把這台系統改成了 permissive 模式,網頁伺服器的 policy 也停留
+  在預設值。
+
+    1. 把 SELinux 改回「ENFORCING」模式——現在立即生效,之後每次
+       開機也都是 enforcing。
+
+    2. 開啟讓 httpd 可以提供使用者家目錄內容的 boolean:
+       httpd_enable_homedirs
+
+    3. 開啟讓 httpd 可以對外建立網路連線的 boolean:
+       httpd_can_network_connect
+
+  兩個 boolean 在重開機後都必須仍然是開啟的——只對執行中系統生效
+  的變更不會過關。檢查:
+
+      getsebool -a | grep httpd
+      semanage boolean -l | grep httpd_enable_homedirs
+EOF
+}
+
+# semanage prints "name  (current , persistent)  description"
+_bool_on_persistently() {
+    local b=$1
+    semanage boolean -l 2>/dev/null | awk -v b="$b" '
+        $1 == b { gsub(/[(),]/, ""); if ($2 == "on" && $3 == "on") ok = 1 }
+        END { exit !ok }'
+}
+
+_homedirs()  { _bool_on_persistently httpd_enable_homedirs; }
+_netconnect(){ _bool_on_persistently httpd_can_network_connect; }
+
+lab_setup() {
+    lab_ensure_pkg policycoreutils-python-utils
+    setsebool -P httpd_enable_homedirs off      >/dev/null 2>&1
+    setsebool -P httpd_can_network_connect off  >/dev/null 2>&1
+    sed -ri 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
+    setenforce 0 >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "SELinux is enforcing right now" \
+        '[ "$(getenforce)" = Enforcing ]'
+    grade_check "/etc/selinux/config sets SELINUX=enforcing for the next boot" \
+        'grep -qE "^SELINUX=enforcing" /etc/selinux/config'
+    grade_check "httpd_enable_homedirs is on right now" \
+        '[ "$(getsebool httpd_enable_homedirs | awk "{print \$3}")" = on ]'
+    grade_test "httpd_enable_homedirs stays on after a reboot" _homedirs
+    grade_test "httpd_can_network_connect is on, persistently" _netconnect
+}
+
+lab_finish() {
+    setsebool -P httpd_enable_homedirs off     >/dev/null 2>&1
+    setsebool -P httpd_can_network_connect off >/dev/null 2>&1
+    sed -ri 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config
+    setenforce 1 >/dev/null 2>&1
+    return 0
+}

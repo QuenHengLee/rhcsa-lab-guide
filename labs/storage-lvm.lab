@@ -1,0 +1,95 @@
+# shellcheck shell=bash
+LAB_TITLE="Build a volume group with a custom extent size"
+LAB_TOPIC="04 storage"
+LAB_NODE="servera"
+
+LAB_VG=wgroup
+LAB_LV=wshare
+LAB_TARGET=/mnt/wshare
+
+lab_describe() {
+    cat <<'EOF'
+  The disk /dev/nvme0n1 is blank and reserved for practice.
+
+    1. Create a partition on /dev/nvme0n1 and turn it into an LVM
+       physical volume.
+
+    2. Create a volume group called "wgroup" whose physical extent size
+       is 8 MiB - not the 4 MiB default.
+
+    3. Create a logical volume called "wshare" that is exactly 100
+       extents in size. (With 8 MiB extents that comes to 800 MiB; size
+       it in extents, not megabytes.)
+
+    4. Format it with a VFAT filesystem and mount it persistently at
+       /mnt/wshare.
+
+  ----- 中文說明 -----
+
+  磁碟 /dev/nvme0n1 是空白的練習碟。
+
+    1. 在 /dev/nvme0n1 建立一個分割區,並把它設為 LVM 的
+       physical volume。
+
+    2. 建立名為「wgroup」的 volume group,physical extent 大小為
+       8 MiB——不是預設的 4 MiB。
+
+    3. 建立名為「wshare」的 logical volume,大小必須恰好是 100 個
+       extents。(以 8 MiB 的 extent 計算就是 800 MiB;請以 extents
+       數量指定大小,不要用 MB。)
+
+    4. 格式化為 VFAT 檔案系統,並持久(重開機仍有效)掛載在
+       /mnt/wshare。
+EOF
+}
+
+_pe_size_ok() {
+    [ "$(vgs --noheadings --units m --nosuffix -o vg_extent_size "$LAB_VG" 2>/dev/null | tr -d ' ')" = "8.00" ]
+}
+
+_lv_extents_ok() {
+    [ "$(lvs --noheadings -o lv_size --units m --nosuffix "$LAB_VG/$LAB_LV" 2>/dev/null | tr -d ' ')" = "800.00" ]
+}
+
+_is_vfat() {
+    [ "$(blkid -s TYPE -o value "/dev/$LAB_VG/$LAB_LV" 2>/dev/null)" = vfat ]
+}
+
+_mounted_here() {
+    local src
+    src=$(findmnt -nro SOURCE --mountpoint "$LAB_TARGET" 2>/dev/null) || return 1
+    [ -n "$src" ] || return 1
+    [ "$(realpath "$src" 2>/dev/null)" = "$(realpath "/dev/$LAB_VG/$LAB_LV" 2>/dev/null)" ]
+}
+
+lab_setup() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    rm -rf "$LAB_TARGET"
+    lab_wipe_disk "$LAB_DISK1"
+    lab_ensure_pkg dosfstools
+    return 0
+}
+
+lab_grade() {
+    grade_check "volume group wgroup exists" \
+        'vgs wgroup'
+    grade_test "its physical extent size is 8 MiB" _pe_size_ok
+    grade_check "logical volume wshare exists in wgroup" \
+        'lvs wgroup/wshare'
+    grade_test "wshare is 100 extents (800 MiB)" _lv_extents_ok
+    grade_test "it holds a VFAT filesystem" _is_vfat
+    grade_test "it is mounted at /mnt/wshare right now" _mounted_here
+    grade_check "/etc/fstab mounts it at boot" \
+        'lab_fstab_has /mnt/wshare'
+    grade_check "the fstab file is free of errors" \
+        'findmnt --verify --verbose >/dev/null'
+}
+
+lab_finish() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    rm -rf "$LAB_TARGET"
+    lab_wipe_disk "$LAB_DISK1"
+    return 0
+}

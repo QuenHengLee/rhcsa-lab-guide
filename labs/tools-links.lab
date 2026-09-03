@@ -1,0 +1,80 @@
+# shellcheck shell=bash
+# Source: RH124 ch.7.4 "Create Links Between Files"
+LAB_TITLE="Hard links and symbolic links"
+LAB_TOPIC="01 essential-tools"
+LAB_NODE="servera"
+
+LAB_DIR=/opt/labdata
+LAB_SRC=/opt/labdata/original.txt
+
+lab_describe() {
+    cat <<'EOF'
+  The file /opt/labdata/original.txt already exists.
+
+    1. Create a HARD link to it called /opt/labdata/hard.txt
+
+    2. Create a SYMBOLIC link to it called /opt/labdata/soft.txt
+
+  Afterwards, prove to yourself that you understand the difference:
+  "ls -li /opt/labdata" shows the hard link sharing an inode number with
+  the original and a link count of 2, while the symbolic link has its own
+  inode and merely points at a path.
+
+  ----- 中文說明 -----
+
+  檔案 /opt/labdata/original.txt 已存在。
+
+    1. 為它建立一個「硬連結」(hard link):/opt/labdata/hard.txt
+
+    2. 為它建立一個「符號連結」(symbolic link):/opt/labdata/soft.txt
+
+  完成後自己驗證兩者差異:「ls -li /opt/labdata」會顯示硬連結與原檔
+  共用同一個 inode 編號、link count 為 2;而符號連結有自己的 inode,
+  只是指向一個路徑。
+EOF
+}
+
+_same_inode() {
+    [ -f "$LAB_SRC" ] && [ -f "$LAB_DIR/hard.txt" ] &&
+    [ "$(stat -c %i "$LAB_SRC")" = "$(stat -c %i "$LAB_DIR/hard.txt")" ]
+}
+
+_link_count() {
+    [ "$(stat -c %h "$LAB_SRC" 2>/dev/null)" = 2 ]
+}
+
+_is_symlink() { [ -L "$LAB_DIR/soft.txt" ]; }
+
+_symlink_target() {
+    [ -L "$LAB_DIR/soft.txt" ] || return 1
+    [ "$(readlink -f "$LAB_DIR/soft.txt" 2>/dev/null)" = "$(readlink -f "$LAB_SRC" 2>/dev/null)" ]
+}
+
+lab_setup() {
+    rm -rf "$LAB_DIR"
+    install -d -m 755 "$LAB_DIR"
+    cat > "$LAB_SRC" <<'EOF'
+This is the original file.
+Changing it through a hard link changes this same content.
+EOF
+    chmod 644 "$LAB_SRC"
+    return 0
+}
+
+lab_grade() {
+    grade_check "/opt/labdata/original.txt is still there" \
+        '[ -f /opt/labdata/original.txt ]'
+    grade_check "/opt/labdata/hard.txt exists" \
+        '[ -e /opt/labdata/hard.txt ]'
+    grade_test "hard.txt shares an inode with original.txt (it is a hard link)" _same_inode
+    grade_test "original.txt now has a link count of 2" _link_count
+    grade_check "/opt/labdata/soft.txt exists" \
+        '[ -e /opt/labdata/soft.txt ]'
+    grade_test "soft.txt is a symbolic link, not a copy" _is_symlink
+    grade_test "soft.txt resolves to original.txt" _symlink_target
+}
+
+lab_finish() {
+    rm -rf "$LAB_DIR"
+    return 0
+}

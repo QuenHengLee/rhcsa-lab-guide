@@ -1,0 +1,71 @@
+# shellcheck shell=bash
+LAB_TITLE="Schedule a recurring job for another user"
+LAB_TOPIC="06 scheduling-and-services"
+LAB_NODE="servera"
+
+LAB_U=natasha
+
+lab_describe() {
+    cat <<'EOF'
+  The user natasha already exists.
+
+  Arrange for the command
+
+      /usr/bin/logger "EX200 in progress"
+
+  to run as natasha every day at 14:23 - and at no other time.
+
+  The job must belong to natasha's own crontab, not to root's and not to
+  a file you drop in /etc/cron.d. The cron service must be enabled so the
+  job also runs after a reboot.
+
+  ----- 中文說明 -----
+
+  使用者 natasha 已存在。
+
+  安排指令
+
+      /usr/bin/logger "EX200 in progress"
+
+  以 natasha 的身分,每天 14:23 執行——其他任何時間都不可以執行。
+
+  這個工作必須放在 natasha 自己的 crontab 裡——不是 root 的,也
+  不是丟一個檔案到 /etc/cron.d。cron 服務必須是 enabled,重開機後
+  工作也照樣執行。
+EOF
+}
+
+_crontab_ok() {
+    crontab -l -u "$LAB_U" 2>/dev/null | grep -vE '^[[:space:]]*(#|$)' \
+        | grep -Eq '^[[:space:]]*23[[:space:]]+14[[:space:]]+\*[[:space:]]+\*[[:space:]]+\*[[:space:]]+.*logger.*EX200 in progress'
+}
+
+_only_one_job() {
+    [ "$(crontab -l -u "$LAB_U" 2>/dev/null | grep -cvE '^[[:space:]]*(#|$)')" = "1" ]
+}
+
+lab_setup() {
+    lab_user_del "$LAB_U"
+    useradd -m "$LAB_U" || return 1
+    crontab -r -u "$LAB_U" 2>/dev/null
+    lab_ensure_pkg cronie
+    systemctl enable --now crond >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "the cron service is enabled at boot" \
+        'systemctl is-enabled --quiet crond'
+    grade_check "the cron service is running" \
+        'systemctl is-active --quiet crond'
+    grade_check "natasha has a crontab" \
+        'crontab -l -u natasha'
+    grade_test "it runs the logger command at 14:23 every day" _crontab_ok
+    grade_test "it contains exactly that one job" _only_one_job
+}
+
+lab_finish() {
+    crontab -r -u "$LAB_U" 2>/dev/null
+    lab_user_del "$LAB_U"
+    return 0
+}

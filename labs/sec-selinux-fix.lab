@@ -1,0 +1,126 @@
+# shellcheck shell=bash
+# Source: RH134 ch.6.8 "Investigate and Resolve SELinux Issues" and the chapter
+# lab ch.6.9 "Manage Security with SELinux".
+LAB_TITLE="Diagnose and repair an SELinux denial"
+LAB_TOPIC="08 security"
+LAB_NODE="servera"
+
+LAB_DIR=/lab-content
+LAB_PAGE=/lab-content/lab.html
+LAB_TEXT="This is the SELinux final lab html file on SERVERA."
+LAB_CONF=/etc/httpd/conf.d/lab-content.conf
+
+lab_describe() {
+    cat <<'EOF'
+  httpd has been reconfigured to serve its content from /lab-content, and
+  the file /lab-content/lab.html is in place with the correct owner and
+  ordinary permissions. The service is running.
+
+  Even so, this fails:
+
+      curl http://localhost/lab.html
+
+  Work out why and fix it, leaving SELinux in enforcing mode.
+
+  Useful starting points:
+
+      less /var/log/messages        (search for "sealert")
+      sealert -l <the id it prints>
+      ausearch -m AVC -ts recent
+      ls -dZ /lab-content /var/www/html
+
+  Your fix must be PERMANENT: it has to survive a full filesystem
+  relabel, so a bare chcon is not sufficient.
+
+  ----- 中文說明 -----
+
+  httpd 已被重新設定為從 /lab-content 提供內容,/lab-content/lab.html
+  也已就位,擁有者與一般權限都正確,服務正在執行。
+
+  即便如此,這個指令仍然失敗:
+
+      curl http://localhost/lab.html
+
+  找出原因並修復它,同時讓 SELinux 保持在 enforcing 模式。
+
+  有用的切入點:
+
+      less /var/log/messages        (搜尋 "sealert")
+      sealert -l <它印出來的 id>
+      ausearch -m AVC -ts recent
+      ls -dZ /lab-content /var/www/html
+
+  你的修法必須是「永久的」:它得撐得過一次完整的檔案系統
+  relabel,所以只用 chcon 是不夠的。
+EOF
+}
+
+_page_context_ok() {
+    ls -Z "$LAB_PAGE" 2>/dev/null | grep -q 'httpd_sys_content_t'
+}
+
+# A chcon-only fix disappears on relabel; the policy database must know.
+# -C lists local customizations only, which is both the right question and
+# far less output than the full policy dump.
+_fcontext_rule_exists() {
+    semanage fcontext -C -l 2>/dev/null | grep -q '/lab-content'
+}
+
+_survives_relabel() {
+    restorecon -R "$LAB_DIR" >/dev/null 2>&1
+    _page_context_ok
+}
+
+_serves_page() {
+    curl -s --max-time 10 http://localhost/lab.html 2>/dev/null | grep -qF "$LAB_TEXT"
+}
+
+lab_setup() {
+    lab_ensure_pkg httpd policycoreutils-python-utils setroubleshoot-server curl
+
+    # Undo any previous fix so the denial is reproducible.
+    semanage fcontext -d '/lab-content(/.*)?' >/dev/null 2>&1
+    rm -rf "$LAB_DIR"
+
+    install -d -m 755 "$LAB_DIR"
+    printf '%s\n' "$LAB_TEXT" > "$LAB_PAGE"
+    chown root:root "$LAB_PAGE"
+    chmod 644 "$LAB_PAGE"
+    # Ordinary permissions are fine; the label is not. Force default_t so the
+    # denial is the only thing standing in the way.
+    chcon -t default_t "$LAB_DIR" "$LAB_PAGE" >/dev/null 2>&1
+
+    cat > "$LAB_CONF" <<'EOF'
+DocumentRoot "/lab-content"
+<Directory "/lab-content">
+    AllowOverride None
+    Require all granted
+</Directory>
+EOF
+    sed -ri 's/^[[:space:]]*Listen[[:space:]]+[0-9]+.*/Listen 80/' /etc/httpd/conf/httpd.conf
+    setenforce 1 >/dev/null 2>&1
+    sed -ri 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config
+    systemctl enable --now httpd >/dev/null 2>&1
+    systemctl restart httpd >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "SELinux is still enforcing" \
+        '[ "$(getenforce)" = Enforcing ]'
+    grade_check "httpd is running" \
+        'systemctl is-active --quiet httpd'
+    grade_test "the page is served over HTTP" _serves_page
+    grade_test "lab.html carries the httpd_sys_content_t label" _page_context_ok
+    grade_test "a permanent fcontext rule covers /lab-content" _fcontext_rule_exists
+    grade_test "the label survives a restorecon (the fix is not just chcon)" _survives_relabel
+}
+
+lab_finish() {
+    systemctl disable --now httpd >/dev/null 2>&1
+    rm -f "$LAB_CONF"
+    semanage fcontext -d '/lab-content(/.*)?' >/dev/null 2>&1
+    rm -rf "$LAB_DIR"
+    setenforce 1 >/dev/null 2>&1
+    return 0
+}

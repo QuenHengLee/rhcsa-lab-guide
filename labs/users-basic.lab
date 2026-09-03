@@ -1,0 +1,90 @@
+# shellcheck shell=bash
+LAB_TITLE="Users, groups, shells, UIDs and password ageing"
+LAB_TOPIC="02 users-and-groups"
+LAB_NODE="servera"
+
+LAB_U_ALL=(natasha harry sarah jean)
+LAB_G=manager
+LAB_PW='Redhat123!'
+
+lab_describe() {
+    cat <<'EOF'
+  Set up the following accounts on servera. Every password below is
+
+      Redhat123!
+
+    1. A group called "manager".
+
+    2. Users "natasha" and "harry". Both must have "manager" as a
+       supplementary group - it must not become their primary group.
+
+    3. A user "sarah" whose login shell is /sbin/nologin. She must NOT be
+       a member of "manager".
+
+    4. A user "jean" whose UID is exactly 4332.
+
+    5. natasha's password must expire after at most 30 days.
+
+  ----- 中文說明 -----
+
+  在 servera 上建立以下帳號。下列所有密碼都是
+
+      Redhat123!
+
+    1. 建立群組「manager」。
+
+    2. 建立使用者「natasha」與「harry」。兩人都必須以 manager 作為
+       「附加群組」(supplementary group)——不可以變成主要群組。
+
+    3. 建立使用者「sarah」,登入 shell 為 /sbin/nologin。她「不可以」
+       是 manager 的成員。
+
+    4. 建立使用者「jean」,UID 必須恰好是 4332。
+
+    5. natasha 的密碼最多 30 天就必須過期。
+EOF
+}
+
+lab_setup() {
+    lab_user_del "${LAB_U_ALL[@]}"
+    lab_group_del "$LAB_G"
+    return 0
+}
+
+lab_grade() {
+    local u
+    grade_check "group manager exists" \
+        'getent group manager'
+
+    for u in natasha harry; do
+        grade_check "user $u exists" "id $u"
+        grade_check "$u is a supplementary member of manager" \
+            "id -nG $u | tr ' ' '\n' | grep -qx manager"
+        grade_check "manager is not $u's primary group" \
+            "[ \"\$(id -gn $u)\" != manager ]"
+    done
+
+    grade_check "user sarah exists" 'id sarah'
+    grade_check "sarah's login shell is /sbin/nologin" \
+        '[ "$(getent passwd sarah | cut -d: -f7)" = /sbin/nologin ]'
+    grade_check "sarah is NOT a member of manager" \
+        '! id -nG sarah | tr " " "\n" | grep -qx manager'
+
+    grade_check "user jean exists" 'id jean'
+    grade_check "jean's UID is 4332" \
+        '[ "$(id -u jean)" = 4332 ]'
+
+    for u in "${LAB_U_ALL[@]}"; do
+        grade_test "$u's password is set to Redhat123!" \
+            lab_password_is "$u" "$LAB_PW"
+    done
+
+    grade_check "natasha's password expires after at most 30 days" \
+        '[ -n "$(getent shadow natasha | cut -d: -f5)" ] && [ "$(getent shadow natasha | cut -d: -f5)" -le 30 ]'
+}
+
+lab_finish() {
+    lab_user_del "${LAB_U_ALL[@]}"
+    lab_group_del "$LAB_G"
+    return 0
+}

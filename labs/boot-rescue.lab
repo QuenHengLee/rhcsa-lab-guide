@@ -1,0 +1,137 @@
+# shellcheck shell=bash
+# Source: RH134 ch.12.6 / 12.7 "Repair a Damaged File System at Boot Time"
+LAB_TITLE="Repair an unbootable system from the console"
+LAB_TOPIC="12 boot-and-recovery"
+LAB_NODE="servera"
+
+LAB_BADUUID="deadbeef-0000-0000-0000-000000000000"
+LAB_BADMNT=/mnt/broken
+LAB_STAMP=/var/lib/rhcsa-labs/boot-rescue.stamp
+
+lab_describe() {
+    cat <<'EOF'
+  *** THIS EXERCISE DELIBERATELY BREAKS THE BOOT PROCESS ***
+
+  A bogus entry has been added to /etc/fstab referring to a filesystem
+  that does not exist. The system is still running, but the NEXT REBOOT
+  will fail and drop into emergency mode.
+
+  You will need the VM console for this - SSH will not be available while
+  the system is stuck. If servera is running headless, shut it down and
+  start it again with:
+
+      VBoxManage startvm servera --type separate
+
+  Your task:
+
+    1. Reboot servera and watch it fail.
+
+    2. From the emergency shell, log in as root (password: student),
+       remount the root filesystem read-write:
+
+           mount -o remount,rw /
+
+    3. Find and remove the broken entry in /etc/fstab.
+
+    4. Verify the file with "findmnt --verify" before you trust it.
+
+    5. Reboot again and confirm the system comes up normally.
+
+  A pristine copy of the original file is kept at
+  /var/lib/rhcsa-labs/fstab.orig if you need to compare.
+
+  Grading requires that you actually rebooted after fixing it - simply
+  editing fstab without testing the boot will not pass.
+
+  ----- 中文說明 -----
+
+  *** 本練習會「蓄意」破壞開機程序 ***
+
+  /etc/fstab 已被加入一筆假的項目,指向一個不存在的檔案系統。系統
+  目前仍在運作,但「下一次重開機」會失敗並掉進 emergency mode。
+
+  這一題必須使用 VM 的 console 操作——系統卡住期間 SSH 是連不上
+  的。如果 servera 目前是 headless 執行,請先關機,再用以下指令
+  啟動:
+
+      VBoxManage startvm servera --type separate
+
+  你的任務:
+
+    1. 重新開機 servera,看著它開機失敗。
+
+    2. 在 emergency shell 以 root 登入(密碼:student),把根檔案
+       系統重新掛載為可讀寫:
+
+           mount -o remount,rw /
+
+    3. 找出並移除 /etc/fstab 裡壞掉的那一筆。
+
+    4. 在相信這個檔案之前,先用「findmnt --verify」驗證它。
+
+    5. 再次重開機,確認系統正常開起來。
+
+  原始檔案的完整備份放在 /var/lib/rhcsa-labs/fstab.orig,需要時可
+  拿來比對。
+
+  評分會要求你修好之後「真的重開機過」——只改了 fstab 而沒有實際
+  測試開機,是不會過關的。
+EOF
+}
+
+_no_bad_entry() {
+    ! grep -q "$LAB_BADUUID" /etc/fstab
+}
+
+_fstab_verifies() {
+    findmnt --verify >/dev/null 2>&1
+}
+
+_rebooted_since_setup() {
+    [ -f "$LAB_STAMP" ] || return 1
+    local stamp boot
+    stamp=$(cat "$LAB_STAMP" 2>/dev/null)
+    boot=$(date -d "$(uptime -s)" +%s 2>/dev/null)
+    [ -n "$stamp" ] && [ -n "$boot" ] && [ "$boot" -gt "$stamp" ]
+}
+
+_system_healthy() {
+    case "$(systemctl is-system-running 2>/dev/null)" in
+        running|degraded) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+lab_setup() {
+    # Remove any previous breakage first so the exercise is repeatable.
+    sed -i "/$LAB_BADUUID/d" /etc/fstab
+    lab_fstab_remove "$LAB_BADMNT"
+
+    install -d -m 755 "$(dirname "$LAB_STAMP")"
+    install -d -m 755 "$LAB_BADMNT"
+    printf 'UUID=%s %s xfs defaults 0 0\n' "$LAB_BADUUID" "$LAB_BADMNT" >> /etc/fstab
+    date +%s > "$LAB_STAMP"
+    systemctl daemon-reload >/dev/null 2>&1
+
+    printf '\n  %s/etc/fstab now contains a deliberately broken entry.%s\n' "$C_YEL" "$C_0"
+    printf '  Reboot servera to begin. You will need console access.\n'
+    return 0
+}
+
+lab_grade() {
+    grade_test "the bogus fstab entry is gone"           _no_bad_entry
+    grade_test "findmnt --verify reports no problems"    _fstab_verifies
+    grade_test "the system booted normally after the fix" _rebooted_since_setup
+    grade_test "systemd reports the system as healthy"   _system_healthy
+    grade_check "the root filesystem is mounted read-write" \
+        'findmnt -no OPTIONS / | grep -q "^rw"'
+}
+
+lab_finish() {
+    sed -i "/$LAB_BADUUID/d" /etc/fstab
+    lab_fstab_remove "$LAB_BADMNT"
+    rmdir "$LAB_BADMNT" 2>/dev/null
+    rm -f "$LAB_STAMP"
+    systemctl daemon-reload >/dev/null 2>&1
+    return 0
+}

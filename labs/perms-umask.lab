@@ -1,0 +1,86 @@
+# shellcheck shell=bash
+# Source: RH124 ch.11.6 "Manage Default Permissions and Special Permissions"
+LAB_TITLE="Set a user's default permissions with umask"
+LAB_TOPIC="03 permissions"
+LAB_NODE="servera"
+
+LAB_U=webdev
+
+lab_describe() {
+    cat <<'EOF'
+  The user webdev already exists.
+
+  Change webdev's environment so that, in any new login shell, the
+  default permissions on things they create are:
+
+      new files        rw-r-----   (640)
+      new directories  rwxr-x---   (750)
+
+  In other words their umask must be 0027, and it must still be 0027
+  after they log out and back in - setting it once in the current shell
+  is not enough.
+
+  Other users' defaults must not change.
+
+  ----- 中文說明 -----
+
+  使用者 webdev 已存在。
+
+  調整 webdev 的環境,使其在任何「新的登入 shell」中,新建立東西的
+  預設權限為:
+
+      新檔案    rw-r-----   (640)
+      新目錄    rwxr-x---   (750)
+
+  換句話說,umask 必須是 0027,而且登出再重新登入之後仍然是 0027
+  ——只在目前的 shell 裡設定一次是不夠的。
+
+  其他使用者的預設值不可以被改變。
+EOF
+}
+
+_umask_value() {
+    [ "$(runuser -l "$LAB_U" -c 'umask' 2>/dev/null)" = "0027" ]
+}
+
+_file_mode() {
+    local probe=/tmp/labumask.$$ mode
+    runuser -l "$LAB_U" -c "rm -f $probe; touch $probe" 2>/dev/null || return 1
+    mode=$(stat -c %a "$probe" 2>/dev/null)
+    rm -f "$probe"
+    [ "$mode" = 640 ]
+}
+
+_dir_mode() {
+    local probe=/tmp/labumaskd.$$ mode
+    runuser -l "$LAB_U" -c "rm -rf $probe; mkdir $probe" 2>/dev/null || return 1
+    mode=$(stat -c %a "$probe" 2>/dev/null)
+    rm -rf "$probe"
+    [ "$mode" = 750 ]
+}
+
+_root_untouched() {
+    [ "$(runuser -l root -c 'umask' 2>/dev/null)" != "0027" ]
+}
+
+lab_setup() {
+    lab_user_del "$LAB_U"
+    useradd -m "$LAB_U" || return 1
+    # Remove any leftover system-wide override from a previous attempt.
+    rm -f /etc/profile.d/lab-umask.sh
+    return 0
+}
+
+lab_grade() {
+    grade_check "the user webdev exists" 'id webdev'
+    grade_test "a login shell for webdev reports umask 0027" _umask_value
+    grade_test "a file webdev creates gets mode 640" _file_mode
+    grade_test "a directory webdev creates gets mode 750" _dir_mode
+    grade_test "root's default umask was not changed" _root_untouched
+}
+
+lab_finish() {
+    lab_user_del "$LAB_U"
+    rm -f /etc/profile.d/lab-umask.sh
+    return 0
+}

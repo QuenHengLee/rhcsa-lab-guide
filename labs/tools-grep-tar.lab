@@ -1,0 +1,74 @@
+# shellcheck shell=bash
+LAB_TITLE="Filter a log with grep, then archive the result"
+LAB_TOPIC="01 essential-tools"
+LAB_NODE="servera"
+
+LAB_LOG=/opt/lab/system.log
+LAB_OUT=/root/errors.txt
+LAB_TAR=/root/errors.tar.bz2
+
+lab_describe() {
+    cat <<'EOF'
+  The file /opt/lab/system.log contains mixed severity messages.
+
+    1. Write every line that contains the string ERROR - and only those
+       lines, in their original order - to /root/errors.txt.
+
+    2. Pack /root/errors.txt into a bzip2-compressed tar archive at
+       /root/errors.tar.bz2. The archive must contain the file itself,
+       not an empty directory.
+
+  Case matters: WARNING lines mentioning "error" in lower case are not
+  ERROR lines.
+
+  ----- 中文說明 -----
+
+  檔案 /opt/lab/system.log 混雜著各種嚴重度的訊息。
+
+    1. 把所有含字串 ERROR 的行——只有那些行,並保持原本順序——
+       寫入 /root/errors.txt。
+
+    2. 把 /root/errors.txt 打包成 bzip2 壓縮的 tar 壓縮檔,路徑為
+       /root/errors.tar.bz2。壓縮檔必須包含檔案本身,不能是空目錄。
+
+  大小寫有別:內文提到小寫 "error" 的 WARNING 行不算 ERROR 行。
+EOF
+}
+
+lab_setup() {
+    rm -f "$LAB_OUT" "$LAB_TAR"
+    install -d -m 755 "$(dirname "$LAB_LOG")"
+    cat > "$LAB_LOG" <<'EOF'
+Jan 03 09:14:02 servera kernel: INFO  usb 1-1: new high-speed USB device
+Jan 03 09:14:09 servera sshd[1120]: INFO  Accepted publickey for student
+Jan 03 09:15:44 servera httpd[1331]: ERROR failed to bind to 0.0.0.0:80
+Jan 03 09:16:01 servera systemd[1]: WARNING unit tuned.service is masked
+Jan 03 09:17:23 servera kernel: ERROR ata2.00: failed command READ DMA
+Jan 03 09:18:00 servera chronyd[884]: INFO  selected source 10.0.2.3
+Jan 03 09:19:37 servera sudo[1502]: WARNING an error was logged earlier
+Jan 03 09:20:11 servera httpd[1331]: ERROR permission denied on /web/index.html
+Jan 03 09:21:45 servera kernel: INFO  EXT4-fs mounted filesystem
+Jan 03 09:22:58 servera nfsd[1610]: ERROR export /rhome not found
+EOF
+    chmod 644 "$LAB_LOG"
+    return 0
+}
+
+lab_grade() {
+    grade_check "/root/errors.txt exists" \
+        '[ -f /root/errors.txt ]'
+    grade_check "/root/errors.txt holds exactly the ERROR lines, in order" \
+        'diff -q <(grep ERROR /opt/lab/system.log) /root/errors.txt'
+    grade_check "/root/errors.tar.bz2 exists" \
+        '[ -f /root/errors.tar.bz2 ]'
+    grade_check "the archive is really bzip2-compressed" \
+        'file -b /root/errors.tar.bz2 | grep -qi bzip2'
+    grade_check "the archive contains errors.txt" \
+        'tar -tjf /root/errors.tar.bz2 | grep -q "errors\.txt$"'
+}
+
+lab_finish() {
+    rm -f "$LAB_OUT" "$LAB_TAR"
+    rm -rf /opt/lab
+    return 0
+}

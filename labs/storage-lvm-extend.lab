@@ -1,0 +1,125 @@
+# shellcheck shell=bash
+LAB_TITLE="Extend a logical volume and its filesystem, without data loss"
+LAB_TOPIC="04 storage"
+LAB_NODE="servera"
+
+LAB_VG=testvg
+LAB_LV=vo
+LAB_TARGET=/mnt/vo
+LAB_MARKER=/mnt/vo/company-data.txt
+
+lab_describe() {
+    cat <<'EOF'
+  The logical volume "vo" in volume group "testvg" is mounted at /mnt/vo.
+  It is currently 512 MiB and it already contains a file called
+  company-data.txt that must survive.
+
+  Grow the logical volume AND the XFS filesystem on it to at least
+  1 GiB.
+
+  The file /mnt/vo/company-data.txt must still be there, byte for byte
+  identical, when you are finished. Check with "df -h /mnt/vo" that the
+  filesystem itself - not just the volume - actually grew.
+
+  ----- 中文說明 -----
+
+  volume group「testvg」中的 logical volume「vo」掛載在 /mnt/vo,
+  目前大小 512 MiB,裡面已有一個必須保留的檔案 company-data.txt。
+
+  請把這個 logical volume「以及」其上的 XFS 檔案系統擴充到至少
+  1 GiB。
+
+  完成後 /mnt/vo/company-data.txt 必須逐位元組完全相同地存在。
+  用「df -h /mnt/vo」確認真正長大的是檔案系統本身——而不只是
+  volume。
+EOF
+}
+
+_statefile() { printf '%s\n' "$LAB_STATE/storage-lvm-extend.sha256"; }
+
+_lv_big_enough() {
+    local m
+    m=$(lvs --noheadings -o lv_size --units m --nosuffix "$LAB_VG/$LAB_LV" 2>/dev/null | tr -d ' ') || return 1
+    [ -n "$m" ] || return 1
+    [ "${m%.*}" -ge 1024 ]
+}
+
+_fs_big_enough() {
+    local m
+    m=$(df -BM --output=size "$LAB_TARGET" 2>/dev/null | tail -1 | tr -dc '0-9') || return 1
+    [ -n "$m" ] || return 1
+    # A 1 GiB XFS reports about 960 MiB usable once metadata is accounted for,
+    # while the un-extended 512 MiB volume reports roughly 450 MiB. 900 sits
+    # safely between the two.
+    [ "$m" -ge 900 ]
+}
+
+_marker_intact() {
+    [ -f "$LAB_MARKER" ] || return 1
+    local want have
+    want=$(cat "$(_statefile)" 2>/dev/null) || return 1
+    have=$(sha256sum "$LAB_MARKER" 2>/dev/null | awk '{print $1}')
+    [ -n "$want" ] && [ "$want" = "$have" ]
+}
+
+_still_mounted() {
+    findmnt -nro TARGET --mountpoint "$LAB_TARGET" >/dev/null 2>&1
+}
+
+lab_setup() {
+    local part
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    rm -rf "$LAB_TARGET"
+    lab_wipe_disk "$LAB_DISK2"
+
+    parted -s "$LAB_DISK2" mklabel gpt                     || return 1
+    parted -s "$LAB_DISK2" mkpart primary 1MiB 100%        || return 1
+    parted -s "$LAB_DISK2" set 1 lvm on                    || return 1
+    udevadm settle
+    part=$(lsblk -nro NAME "$LAB_DISK2" | tail -n +2 | head -1)
+    [ -n "$part" ] || return 1
+
+    pvcreate -ff -y "/dev/$part"                 >/dev/null 2>&1 || return 1
+    vgcreate "$LAB_VG" "/dev/$part"              >/dev/null 2>&1 || return 1
+    # 512 MiB, not less: mkfs.xfs refuses to build a filesystem under 300 MB.
+    lvcreate -n "$LAB_LV" -L 512M "$LAB_VG"      >/dev/null 2>&1 || return 1
+    mkfs.xfs -f "/dev/$LAB_VG/$LAB_LV"           >/dev/null 2>&1 || return 1
+
+    install -d -m 755 "$LAB_TARGET"
+    mount "/dev/$LAB_VG/$LAB_LV" "$LAB_TARGET"   || return 1
+    cat > "$LAB_MARKER" <<'EOF'
+Q3 revenue figures - do not lose this file.
+account,amount
+north,148230
+south,96110
+east,203775
+west,51940
+EOF
+    install -d -m 755 "$LAB_STATE"
+    sha256sum "$LAB_MARKER" | awk '{print $1}' > "$(_statefile)"
+
+    printf '/dev/%s/%s %s xfs defaults 0 0\n' "$LAB_VG" "$LAB_LV" "$LAB_TARGET" >> /etc/fstab
+    systemctl daemon-reload 2>/dev/null
+    return 0
+}
+
+lab_grade() {
+    grade_test "logical volume testvg/vo is at least 1 GiB" _lv_big_enough
+    grade_test "the filesystem on it grew too (df shows the new size)" _fs_big_enough
+    grade_test "/mnt/vo is still mounted" _still_mounted
+    grade_test "company-data.txt survived unchanged" _marker_intact
+    grade_check "it is still XFS" \
+        '[ "$(findmnt -nro FSTYPE --mountpoint /mnt/vo)" = xfs ]'
+}
+
+lab_finish() {
+    umount -R "$LAB_TARGET" 2>/dev/null
+    lab_fstab_remove "$LAB_TARGET"
+    vgchange -an "$LAB_VG" >/dev/null 2>&1
+    vgremove -f "$LAB_VG"  >/dev/null 2>&1
+    rm -rf "$LAB_TARGET"
+    rm -f "$(_statefile)"
+    lab_wipe_disk "$LAB_DISK2"
+    return 0
+}

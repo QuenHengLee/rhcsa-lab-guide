@@ -1,0 +1,65 @@
+# shellcheck shell=bash
+LAB_TITLE="Grant a group passwordless sudo"
+LAB_TOPIC="02 users-and-groups"
+LAB_NODE="servera"
+
+LAB_G=operators
+LAB_U=opsuser
+
+lab_describe() {
+    cat <<'EOF'
+  The group "operators" already exists on servera.
+
+    1. Create a user "opsuser" whose supplementary groups include
+       "operators". Give the account the password Redhat123!
+
+    2. Configure sudo so that every member of "operators" - now and in
+       future - can run any command as any user WITHOUT being asked for a
+       password.
+
+  Do not edit /etc/sudoers directly with a plain editor; the configuration
+  must still be syntactically valid when you are done.
+
+  ----- 中文說明 -----
+
+  群組「operators」已存在於 servera。
+
+    1. 建立使用者「opsuser」,附加群組須包含 operators,
+       密碼設為 Redhat123!
+
+    2. 設定 sudo,讓 operators 的每一位成員——包含現在與未來加入的
+       ——都能以任何使用者身分執行任何指令,且「不需要輸入密碼」。
+
+  不可以用一般編輯器直接修改 /etc/sudoers;完成後設定檔必須仍然
+  語法正確。
+EOF
+}
+
+lab_setup() {
+    lab_user_del "$LAB_U"
+    lab_group_del "$LAB_G"
+    rm -f /etc/sudoers.d/operators /etc/sudoers.d/"$LAB_G"
+    groupadd "$LAB_G" || return 1
+    return 0
+}
+
+lab_grade() {
+    grade_check "user opsuser exists" 'id opsuser'
+    grade_check "opsuser is a member of operators" \
+        'id -nG opsuser | tr " " "\n" | grep -qx operators'
+    grade_test "opsuser's password is set to Redhat123!" \
+        lab_password_is opsuser 'Redhat123!'
+    grade_check "the sudo configuration is syntactically valid" \
+        'visudo -c'
+    grade_check "operators may run any command, as any user, without a password" \
+        'sudo -l -U opsuser | grep -Eq "\(ALL(: *ALL)?\)[[:space:]]+NOPASSWD:[[:space:]]*ALL"'
+    grade_check "the rule is granted through the group, not to opsuser by name" \
+        'grep -rEq "^[[:space:]]*%operators" /etc/sudoers /etc/sudoers.d/ 2>/dev/null'
+}
+
+lab_finish() {
+    lab_user_del "$LAB_U"
+    lab_group_del "$LAB_G"
+    rm -f /etc/sudoers.d/operators
+    return 0
+}

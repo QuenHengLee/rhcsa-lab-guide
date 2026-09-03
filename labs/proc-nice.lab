@@ -1,0 +1,117 @@
+# shellcheck shell=bash
+# Source: RH134 ch.9.4 "Influence Process Scheduling"
+LAB_TITLE="Change process scheduling priority with nice and renice"
+LAB_TOPIC="11 processes-and-logs"
+LAB_NODE="servera"
+
+LAB_BIN=/usr/local/bin/labload
+LAB_PIDFILE=/var/lib/rhcsa-labs/proc-nice.pid
+
+lab_describe() {
+    cat <<'EOF'
+  A long-running process /usr/local/bin/labload is already running with
+  the default scheduling priority (nice value 0).
+
+    1. Lower the priority of that ALREADY RUNNING process to a nice value
+       of 10. Do not kill and relaunch it - its PID must stay the same.
+       Find it with "pgrep -a labload".
+
+    2. Separately, start a SECOND instance with the command line
+
+           /usr/local/bin/labload 88888
+
+       so that it begins life with a nice value of 15. Set the priority
+       as you launch it, not afterwards. It must keep running when you
+       log out.
+
+  Check your work with:  ps -o pid,ni,cmd -C labload
+
+  ----- 中文說明 -----
+
+  長時間執行的程序 /usr/local/bin/labload 已經以預設排程優先權
+  (nice 值 0)在執行中。
+
+    1. 把那個「已經在執行」的程序,優先權調低為 nice 值 10。
+       不可以砍掉重開——它的 PID 必須保持不變。
+       用「pgrep -a labload」找到它。
+
+    2. 另外,用以下指令列啟動「第二個」實例:
+
+           /usr/local/bin/labload 88888
+
+       讓它從啟動那一刻起 nice 值就是 15。要在啟動的當下設定好
+       優先權,不是事後才調。你登出之後它必須仍持續執行。
+
+  檢查你的成果:ps -o pid,ni,cmd -C labload
+EOF
+}
+
+_orig_pid() { cat "$LAB_PIDFILE" 2>/dev/null; }
+
+_nice_of() { ps -o ni= -p "$1" 2>/dev/null | tr -d ' '; }
+
+_orig_alive() {
+    local p; p=$(_orig_pid) || return 1
+    [ -n "$p" ] && kill -0 "$p" 2>/dev/null
+}
+
+_orig_reniced() {
+    local p; p=$(_orig_pid) || return 1
+    [ "$(_nice_of "$p")" = "10" ]
+}
+
+_second_exists() {
+    local p orig
+    orig=$(_orig_pid)
+    for p in $(pgrep -f "^$LAB_BIN" 2>/dev/null); do
+        [ "$p" = "$orig" ] && continue
+        [ "$(_nice_of "$p")" = "15" ] && return 0
+    done
+    return 1
+}
+
+_second_is_88888() {
+    local p orig
+    orig=$(_orig_pid)
+    for p in $(pgrep -f "^$LAB_BIN 88888$" 2>/dev/null); do
+        [ "$p" = "$orig" ] && continue
+        return 0
+    done
+    return 1
+}
+
+_kill_all() {
+    local p
+    for p in $(pgrep -f "^$LAB_BIN" 2>/dev/null); do kill -9 "$p" 2>/dev/null; done
+    return 0
+}
+
+lab_setup() {
+    _kill_all
+    rm -f "$LAB_PIDFILE"
+    install -d -m 755 "$(dirname "$LAB_PIDFILE")"
+    # A private copy of sleep so the exercise process is easy to identify
+    # and impossible to confuse with a system one.
+    cp -f /usr/bin/sleep "$LAB_BIN" || return 1
+    chmod 755 "$LAB_BIN"
+    setsid "$LAB_BIN" 99999 >/dev/null 2>&1 </dev/null &
+    sleep 1
+    local p
+    p=$(pgrep -f "^$LAB_BIN 99999$" | head -1)
+    [ -n "$p" ] || return 1
+    printf '%s\n' "$p" > "$LAB_PIDFILE"
+    return 0
+}
+
+lab_grade() {
+    grade_test "the original labload process is still running (same PID)" _orig_alive
+    grade_test "its nice value is now 10" _orig_reniced
+    grade_test "a second labload process exists with nice value 15" _second_exists
+    grade_test "the second one was started as 'labload 88888'" _second_is_88888
+}
+
+lab_finish() {
+    _kill_all
+    rm -f "$LAB_BIN" "$LAB_PIDFILE"
+    return 0
+}

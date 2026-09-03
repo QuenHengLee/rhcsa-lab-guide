@@ -1,0 +1,84 @@
+# shellcheck shell=bash
+LAB_TITLE="Collaborative directory with setgid and the sticky bit"
+LAB_TOPIC="03 permissions"
+LAB_NODE="servera"
+
+LAB_G=accounting
+LAB_MEMBERS=(amy ben)
+LAB_DIR=/home/accounting
+
+lab_describe() {
+    cat <<'EOF'
+  The group "accounting" and its members amy and ben already exist.
+
+  Create the shared directory /home/accounting so that:
+
+    - it is group-owned by "accounting";
+    - members of accounting may read, write and traverse it;
+    - users outside the group have no access to it at all;
+    - every file created inside it is automatically group-owned by
+      "accounting", whoever creates it;
+    - a member can delete only their own files, not other members' files.
+
+
+  ----- 中文說明 -----
+
+  群組「accounting」與其成員 amy、ben 已存在。
+
+  建立共享目錄 /home/accounting,使得:
+
+    - 目錄的群組擁有者是 accounting;
+    - accounting 的成員可以讀取、寫入、進入該目錄;
+    - 群組以外的使用者完全無法存取;
+    - 在裡面建立的每個檔案,不論由誰建立,群組擁有者都自動是
+      accounting;
+    - 成員只能刪除自己的檔案,不能刪除其他成員的檔案。
+
+EOF
+}
+
+_inherits_group() {
+    local probe="$LAB_DIR/.labprobe.$$"
+    runuser -u amy -- touch "$probe" 2>/dev/null || return 1
+    local g
+    g=$(stat -c %G "$probe" 2>/dev/null)
+    rm -f "$probe"
+    [ "$g" = "$LAB_G" ]
+}
+
+lab_setup() {
+    local u
+    rm -rf "$LAB_DIR"
+    lab_user_del "${LAB_MEMBERS[@]}"
+    lab_group_del "$LAB_G"
+
+    groupadd "$LAB_G" || return 1
+    for u in "${LAB_MEMBERS[@]}"; do
+        useradd -m -G "$LAB_G" "$u" || return 1
+    done
+    return 0
+}
+
+lab_grade() {
+    grade_check "/home/accounting exists and is a directory" \
+        '[ -d /home/accounting ]'
+    grade_check "it is group-owned by accounting" \
+        '[ "$(stat -c %G /home/accounting)" = accounting ]'
+    grade_check "the permission set is exactly 3770" \
+        '[ "$(stat -c %a /home/accounting)" = 3770 ]'
+    grade_check "setgid is set (new files inherit the group)" \
+        '[ -g /home/accounting ]'
+    grade_check "the sticky bit is set (members cannot delete each other's files)" \
+        '[ -k /home/accounting ]'
+    grade_check "users outside accounting have no access" \
+        '[ $(( 8#$(stat -c %a /home/accounting) & 7 )) -eq 0 ]'
+    grade_test "a file amy creates there really is group-owned by accounting" \
+        _inherits_group
+}
+
+lab_finish() {
+    rm -rf "$LAB_DIR"
+    lab_user_del "${LAB_MEMBERS[@]}"
+    lab_group_del "$LAB_G"
+    return 0
+}

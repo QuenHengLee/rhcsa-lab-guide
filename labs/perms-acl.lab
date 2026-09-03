@@ -1,0 +1,74 @@
+# shellcheck shell=bash
+LAB_TITLE="Per-user access with POSIX ACLs"
+LAB_TOPIC="03 permissions"
+LAB_NODE="servera"
+
+LAB_USERS=(natasha harry)
+LAB_FILE=/var/tmp/fstab
+
+lab_describe() {
+    cat <<'EOF'
+  The users natasha and harry already exist.
+
+    1. Copy /etc/fstab to /var/tmp/fstab. The copy must stay owned by
+       root, and its contents must match the original.
+
+    2. Using ACLs, arrange the following access to /var/tmp/fstab:
+
+         natasha          read and write
+         harry            no access whatsoever
+         everyone else    read only
+
+  The file owner (root) keeps read and write.
+
+  ----- 中文說明 -----
+
+  使用者 natasha 與 harry 已存在。
+
+    1. 把 /etc/fstab 複製到 /var/tmp/fstab。副本必須仍由 root 擁有,
+       內容與原檔一致。
+
+    2. 使用 ACL 為 /var/tmp/fstab 設定以下存取權:
+
+         natasha        可讀寫
+         harry          完全不可存取
+         其他所有人     唯讀
+
+  檔案擁有者(root)保持可讀寫。
+EOF
+}
+
+lab_setup() {
+    local u
+    rm -f "$LAB_FILE"
+    lab_user_del "${LAB_USERS[@]}"
+    for u in "${LAB_USERS[@]}"; do
+        useradd -m "$u" || return 1
+    done
+    return 0
+}
+
+lab_grade() {
+    grade_check "/var/tmp/fstab exists" \
+        '[ -f /var/tmp/fstab ]'
+    grade_check "its contents match /etc/fstab" \
+        'diff -q /etc/fstab /var/tmp/fstab'
+    grade_check "it is still owned by root" \
+        '[ "$(stat -c %U /var/tmp/fstab)" = root ]'
+    grade_check "the file carries an ACL" \
+        'getfacl -c /var/tmp/fstab 2>/dev/null | grep -q "^user:"'
+    grade_check "natasha has read and write" \
+        'getfacl -cE /var/tmp/fstab 2>/dev/null | grep -qx "user:natasha:rw-"'
+    grade_check "harry has no access at all" \
+        'getfacl -cE /var/tmp/fstab 2>/dev/null | grep -qx "user:harry:---"'
+    grade_check "everyone else has read only" \
+        'getfacl -cE /var/tmp/fstab 2>/dev/null | grep -qx "other::r--"'
+    grade_check "the ACL mask does not silently strip natasha's write bit" \
+        'getfacl -c /var/tmp/fstab 2>/dev/null | grep -q "^mask::rw-"'
+}
+
+lab_finish() {
+    rm -f "$LAB_FILE"
+    lab_user_del "${LAB_USERS[@]}"
+    return 0
+}

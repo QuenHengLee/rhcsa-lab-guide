@@ -1,0 +1,87 @@
+# shellcheck shell=bash
+LAB_TITLE="Point chronyd at a specific time source"
+LAB_TOPIC="07 network-and-time"
+LAB_NODE="servera"
+
+LAB_NTP=classroom.lab.example.com
+LAB_CONF=/etc/chrony.conf
+LAB_BACKUP=/var/lib/rhcsa-labs/chrony.conf.orig
+
+lab_describe() {
+    cat <<'EOF'
+  Configure time synchronisation on servera so that chronyd uses
+
+      classroom.lab.example.com
+
+  as its ONLY time source, contacting it with the "iburst" option so the
+  first few requests are sent quickly.
+
+  Every other server or pool line must be gone (or commented out).
+  chronyd must be running and enabled at boot.
+
+  The name does not resolve in this lab network, so chronyd will never
+  actually synchronise - that is expected. The configuration is what is
+  being checked.
+
+  ----- 中文說明 -----
+
+  設定 servera 的時間同步,讓 chronyd 以
+
+      classroom.lab.example.com
+
+  作為「唯一」的時間來源,並加上「iburst」選項,讓最初幾個請求
+  快速送出。
+
+  其他所有的 server 或 pool 設定行都必須刪除(或註解掉)。
+  chronyd 必須正在執行且開機 enabled。
+
+  這個主機名稱在本實驗網路中解析不到,所以 chronyd 永遠不會真的
+  同步成功——這是預期的行為,本題檢查的是設定本身。
+EOF
+}
+
+_only_source() {
+    local n
+    n=$(grep -cE '^[[:space:]]*(server|pool)[[:space:]]' "$LAB_CONF" 2>/dev/null)
+    [ "$n" = "1" ]
+}
+
+_correct_source() {
+    grep -qE "^[[:space:]]*server[[:space:]]+$LAB_NTP([[:space:]]|$)" "$LAB_CONF" 2>/dev/null
+}
+
+_iburst() {
+    grep -qE "^[[:space:]]*server[[:space:]]+$LAB_NTP[[:space:]].*\biburst\b" "$LAB_CONF" 2>/dev/null
+}
+
+lab_setup() {
+    lab_ensure_pkg chrony
+    install -d -m 755 "$(dirname "$LAB_BACKUP")"
+    [ -f "$LAB_BACKUP" ] || cp -a "$LAB_CONF" "$LAB_BACKUP"
+    # Restore a stock-looking configuration so the exercise starts clean.
+    cp -a "$LAB_BACKUP" "$LAB_CONF"
+    systemctl enable --now chronyd >/dev/null 2>&1
+    return 0
+}
+
+lab_grade() {
+    grade_check "chronyd is enabled at boot" \
+        'systemctl is-enabled --quiet chronyd'
+    grade_check "chronyd is running" \
+        'systemctl is-active --quiet chronyd'
+    grade_test "classroom.lab.example.com is configured as a server" _correct_source
+    grade_test "it is configured with the iburst option" _iburst
+    grade_test "it is the only server or pool line left" _only_source
+    # Note: chronyd refuses to start on a malformed chrony.conf, so the
+    # is-active check above already proves the file parses. Do not add a
+    # "chronyd -Q" probe here - it blocks for minutes on an unresolvable
+    # server name.
+}
+
+lab_finish() {
+    if [ -f "$LAB_BACKUP" ]; then
+        cp -a "$LAB_BACKUP" "$LAB_CONF"
+        systemctl restart chronyd >/dev/null 2>&1
+    fi
+    return 0
+}
