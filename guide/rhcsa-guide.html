@@ -622,6 +622,16 @@ UNIT
 <span class="p">#</span> curl http://localhost/lab.html
 <span class="c"># (診斷過程考試可跳過;想看原因:ls -dZ /lab-content、ausearch -m AVC -ts recent)</span></pre>
 <p>套路是「semanage fcontext 定規則(立法)+ restorecon 套標籤(執法)」。只用 <code>chcon</code> 改標籤撐不過 relabel,評分明確會抓這一點。</p>
+<div class="phase"><h4>符號解釋:<code>'/lab-content(/.*)?'</code></h4>
+<p>這個引號裡的東西是一段<strong>正規表達式</strong>(regex),semanage 用它比對「哪些路徑」要套這個標籤。逐塊拆解:</p>
+<pre class="term">/lab-content <span class="c"># 字面路徑:目錄本身</span>
+(         <span class="c"># 群組開始</span>
+  /       <span class="c"># 一個斜線</span>
+  .       <span class="c"># . = 任意一個字元</span>
+  *       <span class="c"># * = 前一個東西出現 0 到多次 → 合起來「/任意字串」</span>
+)?        <span class="c"># ? = 整個群組出現 0 或 1 次(即「可有可無」)</span></pre>
+<p>合起來的意思:<strong>比對 <code>/lab-content</code> 這個目錄本身,以及它底下的所有東西</strong>(<code>/lab-content/lab.html</code>、<code>/lab-content/sub/a.txt</code>…)。關鍵是那個 <code>?</code> ——有它,目錄「本身」和「內容」才會一起被涵蓋;少了它就只比對到底下的檔案、漏掉目錄自己。</p>
+<p class="note">記法:<strong><code>'/路徑(/.*)?'</code> 是 fcontext 的固定慣用寫法</strong>,意思永遠是「這個目錄連同底下遞迴全部」。換題目只要改路徑(<code>/web</code>、<code>/srv/www</code>…),後面的 <code>(/.*)?</code> 照抄即可——不用真的懂 regex,當成一個「遞迴整包」的咒語背下來最省事。<code>man semanage-fcontext</code> 最底部的 EXAMPLES 也是這個寫法。</p></div>
 <div class="phase"><h4>考場自救:man 手冊查法</h4>
 <p>語法記不清時,答案就在系統裡——<code>man semanage-fcontext</code> 最底部的 EXAMPLES 段有完整可抄的範例,連 <code>(/.*)?</code> 的寫法都直接給你。查法三招:</p>
 <pre class="term"><span class="p">#</span> man semanage-fcontext    <span class="c"># 按 G 直達最底部 EXAMPLES,照抄</span>
