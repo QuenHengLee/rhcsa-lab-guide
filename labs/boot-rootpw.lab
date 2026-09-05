@@ -22,21 +22,21 @@ lab_describe() {
 
       VBoxManage startvm serverb --type separate
 
-  Your task:
+  Your task (init=/bin/bash method):
 
     1. Reboot. At the GRUB menu, highlight the default entry, press e.
 
     2. Find the line that starts with "linux", go to its end and append:
 
-           rd.break
+           init=/bin/bash
 
-       Then press Ctrl-x to boot into the initramfs shell.
+       Then press Ctrl-x to boot. The kernel starts a bash shell as PID 1
+       instead of systemd - the real root is mounted at / (read-only),
+       so no /sysroot and no chroot are needed.
 
-    3. The real root filesystem is mounted read-only at /sysroot.
-       Remount it read-write and switch into it:
+    3. Remount the root filesystem read-write:
 
-           mount -o remount,rw /sysroot
-           chroot /sysroot
+           mount -o rw,remount /
 
     4. Set the new password:
 
@@ -48,8 +48,13 @@ lab_describe() {
 
            touch /.autorelabel
 
-    6. Type "exit" twice and let the system boot. It relabels, then
-       reboots once more on its own.
+    6. Hand control back to systemd so the machine finishes booting (it
+       relabels, then reboots once on its own):
+
+           exec /sbin/init
+
+       (If that hangs, force a reboot instead:
+           mount -o ro,remount /  ;  exec /sbin/reboot -f )
 
     7. Confirm you can log in as root with redhat123.
 
@@ -71,21 +76,20 @@ lab_describe() {
 
       VBoxManage startvm serverb --type separate
 
-  你的任務:
+  你的任務(init=/bin/bash 方法):
 
     1. 重開機。在 GRUB 選單把預設項目反白,按 e 編輯。
 
     2. 找到以 "linux" 開頭的那一行,移到行尾,加上:
 
-           rd.break
+           init=/bin/bash
 
-       然後按 Ctrl-x 進入 initramfs shell。
+       然後按 Ctrl-x 開機。核心會用 bash 當 PID 1(而不是 systemd),
+       真正的根直接掛在 /(唯讀)——所以不需要 /sysroot、也不用 chroot。
 
-    3. 真正的根檔案系統以唯讀掛在 /sysroot。把它重新掛成可讀寫,
-       再 chroot 進去:
+    3. 把根檔案系統重新掛成可讀寫:
 
-           mount -o remount,rw /sysroot
-           chroot /sysroot
+           mount -o rw,remount /
 
     4. 設定新密碼:
 
@@ -96,7 +100,13 @@ lab_describe() {
 
            touch /.autorelabel
 
-    6. 連打兩次 "exit" 讓系統開機。它會先 relabel,再自己重開一次。
+    6. 把控制權交還給 systemd,讓機器繼續開完機(它會先 relabel,
+       再自己重開一次):
+
+           exec /sbin/init
+
+       (若卡住,改用強制重開:
+           mount -o ro,remount /  ;  exec /sbin/reboot -f )
 
     7. 確認可以用 redhat123 以 root 登入。
 

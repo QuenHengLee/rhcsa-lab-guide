@@ -848,23 +848,21 @@ REPO
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start boot-rootpw</pre>
 <p class="note">本題把 root 密碼打亂成「你不知道」的值,要用 <strong>GRUB 開機中斷(rd.break)</strong>把它重設為 <code>redhat123</code>。這是 RHCSA 考綱明列、最經典的必考大題(對應「Interrupt the boot process to gain access」)。必須用 serverb 的 console:<br><code>VBoxManage controlvm serverb poweroff</code> → <code>VBoxManage startvm serverb --type separate</code></p></div>
-<div class="phase"><h4>② 逐步解法(在 console 操作)</h4>
+<div class="phase"><h4>② 逐步解法(init=/bin/bash 方法,在 console 操作)</h4>
 <pre class="term"><span class="c"># 1. 重開機,GRUB 選單反白預設項按 e 編輯</span>
-<span class="c"># 2. 找到 linux 開頭那行,移到行尾,加上 rd.break,按 Ctrl-x 開機</span>
-<span class="c"># 3. 進入 initramfs shell 後:</span>
-switch_root:/# mount -o remount,rw /sysroot
-switch_root:/# chroot /sysroot
-sh-5.2# passwd root          <span class="c"># 輸入 redhat123(兩次)</span>
-sh-5.2# touch /.autorelabel  <span class="c"># 關鍵!讓 SELinux 重新標記 /etc/shadow</span>
-sh-5.2# exit
-switch_root:/# exit          <span class="c"># 系統 relabel 後會自己再重開一次</span></pre>
-<p>四個最容易丟分的點:根在 <code>/sysroot</code>(不是 /)、要先 <code>remount,rw</code> 再 <code>chroot</code>、密碼設 <code>redhat123</code>、<strong>一定要 <code>touch /.autorelabel</code></strong>——漏了它,SELinux enforcing 下 /etc/shadow 標籤錯誤,重開後會登入不了(這是本題頭號陷阱)。</p></div>
+<span class="c"># 2. 找到 linux 開頭那行,移到行尾,加上 init=/bin/bash,按 Ctrl-x 開機</span>
+<span class="c"># 3. 核心用 bash 當 PID 1,根直接掛在 /(唯讀)——不用 /sysroot、不用 chroot:</span>
+bash-5.2# mount -o rw,remount /
+bash-5.2# passwd root          <span class="c"># 輸入 redhat123(兩次)</span>
+bash-5.2# touch /.autorelabel  <span class="c"># 關鍵!讓 SELinux 重新標記 /etc/shadow</span>
+bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(relabel 後自己重開一次)</span></pre>
+<p>三個最容易丟分的點:先 <code>mount -o rw,remount /</code> 把根改可寫、密碼設 <code>redhat123</code>、<strong>一定要 <code>touch /.autorelabel</code></strong>——漏了它,SELinux enforcing 下 /etc/shadow 標籤錯誤,重開後會登入不了(頭號陷阱)。最後用 <code>exec /sbin/init</code> 交還 systemd 開完機;若卡住改用 <code>mount -o ro,remount /</code> 再 <code>exec /sbin/reboot -f</code> 強制重開。</p></div>
 <div class="duo">
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># relabel 完、正常開機後,以 redhat123 登入 root:</span>
 <span class="p">#</span> lab grade boot-rootpw</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish boot-rootpw</pre></div>
 </div>
-<p class="note">和 boot-rescue 的差別:emergency mode <strong>要先知道 root 密碼</strong>才進得去;rd.break 進的是更早的 initramfs、<strong>不需密碼</strong>,正是給「連 root 密碼都不知道」用的。兩題操作不同,別搞混。</p></article>
+<p class="note">和 boot-rescue 的差別:emergency mode <strong>要先知道 root 密碼</strong>才進得去;<code>init=/bin/bash</code> 是在 GRUB 直接把 PID 1 換成 bash、跳過登入,<strong>不需密碼</strong>,正是給「連 root 密碼都不知道」用的。兩題操作不同,別搞混。<br><strong>另一種等效教法</strong>是 <code>rd.break</code>(進 initramfs,根在 <code>/sysroot</code>、需 <code>chroot</code>),殊途同歸;克能老師教的 <code>init=/bin/bash</code> 好處是根直接在 <code>/</code>、少一步 chroot。</p></article>
 </section>
 
 <footer>
