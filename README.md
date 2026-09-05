@@ -1,8 +1,8 @@
 # RHCSA 實作練習與題解手冊 · RHCSA Hands-on Lab & Guide
 
-一套為 **RHCSA (EX200, RHEL 10)** 準備的自我練習環境與雙語題解,涵蓋 33 個可自動評分的練習題,對照 Red Hat 官方考綱。適合在自己的 Rocky Linux / RHEL 10 虛擬機上反覆操作。
+一套為 **RHCSA (EX200, RHEL 10)** 準備的自我練習環境與雙語題解,涵蓋 34 個可自動評分的練習題,對照 Red Hat 官方考綱。適合在自己的 Rocky Linux / RHEL 10 虛擬機上反覆操作。
 
-A self-contained practice environment and bilingual (English + 繁體中文) study guide for the **RHCSA (EX200, RHEL 10)** exam: 33 auto-graded exercises mapped to the official objectives, meant to be run over and over on your own Rocky Linux / RHEL 10 VM.
+A self-contained practice environment and bilingual (English + 繁體中文) study guide for the **RHCSA (EX200, RHEL 10)** exam: 34 auto-graded exercises mapped to the official objectives, meant to be run over and over on your own Rocky Linux / RHEL 10 VM.
 
 > ⚠️ 這是**非官方**的社群學習素材,與 Red Hat 無任何關係。練習環境用 Rocky Linux 10(與 RHEL 相容)。
 > Unofficial community study material, not affiliated with Red Hat.
@@ -13,9 +13,9 @@ A self-contained practice environment and bilingual (English + 繁體中文) stu
 
 | 目錄 | 內容 |
 |------|------|
-| `guide/rhcsa-guide.html` | **題解手冊**:33 題的標準解法,每題四步驟(啟動 → 逐步解法 → 評分驗證 → 收尾),含考場心法與 man 查法 |
+| `guide/rhcsa-guide.html` | **題解手冊**:34 題的標準解法,每題四步驟(啟動 → 逐步解法 → 評分驗證 → 收尾),含考場心法與 man 查法 |
 | `guide/disk-partition.html` | **磁碟分割圖解**:五層流程、MBR/GPT、fstab、LVM 積木池、swap 的概念圖 |
-| `labs/*.lab` | 33 個練習題定義(題目、環境佈置、自動評分、清理),中英雙語題目敘述 |
+| `labs/*.lab` | 34 個練習題定義(題目、環境佈置、自動評分、清理),中英雙語題目敘述 |
 | `setup/` | 部署腳本、`lab` 主程式、共用函式庫、彩色提示字元設定 |
 
 兩份 HTML 用瀏覽器直接打開即可閱讀(不需要任何伺服器)。
@@ -44,10 +44,10 @@ cd rhcsa-lab-guide
 sudo ./setup/install-labs.sh
 ```
 
-腳本會把 `lab` 指令、函式庫與 33 個練習裝到系統。裝好後,以任何有 sudo 權限的使用者：
+腳本會把 `lab` 指令、函式庫與 34 個練習裝到系統。裝好後,以任何有 sudo 權限的使用者：
 
 ```bash
-lab list                    # 列出全部 33 題
+lab list                    # 列出全部 34 題
 lab describe storage-lvm    # 只看題目(中英雙語),不動系統
 lab start   storage-lvm     # 重置並佈置環境,顯示題目 → 開始作答
 lab grade   storage-lvm     # 評分:告訴你哪些還沒達成(可重複執行)
@@ -77,7 +77,7 @@ root 顯示紅色使用者名 + `#`,一般使用者顯示綠色 + `$`。
 
 ## 題目涵蓋範圍 · Topics covered
 
-essential-tools（find / grep+tar / links）· users-and-groups · permissions（ACL / setgid+sticky / umask）· storage（分割+UUID掛載 / LVM / LVM擴充 / Stratis / swap）· network-filesystems（rsync / NFS+autofs）· scheduling-and-services（at / cron / systemd timer / 服務控制 / tuned）· network-and-time（nmcli / chrony）· security（firewalld / SELinux boolean / SELinux 修復 / 非標準埠 httpd / SSH 金鑰）· containers（rootless podman）· shell-scripting · processes-and-logs（nice / journal 持久化）· boot-and-recovery（emergency mode 修復）
+essential-tools（find / grep+tar / links）· users-and-groups · permissions（ACL / setgid+sticky / umask）· storage（分割+UUID掛載 / LVM / LVM擴充 / Stratis / swap）· network-filesystems（rsync / NFS+autofs）· scheduling-and-services（at / cron / systemd timer / 服務控制 / tuned）· network-and-time（nmcli / chrony）· security（firewalld / SELinux boolean / SELinux 修復 / 非標準埠 httpd / SSH 金鑰）· containers（rootless podman）· shell-scripting · processes-and-logs（nice / journal 持久化）· boot-and-recovery（emergency mode 修復 / **重設 root 密碼 rd.break**)
 
 ---
 

@@ -1,0 +1,162 @@
+# shellcheck shell=bash
+# Source: RH134 "Reset a Lost root Password" (boot interrupt / rd.break)
+LAB_TITLE="Reset a lost root password from the boot loader"
+LAB_TOPIC="12 boot-and-recovery"
+LAB_NODE="serverb"
+
+LAB_ROOT_TARGET="redhat123"
+LAB_STAMP=/var/lib/rhcsa-labs/boot-rootpw.stamp
+
+lab_describe() {
+    cat <<'EOF'
+  *** THIS EXERCISE CHANGES root's PASSWORD TO A VALUE YOU DO NOT KNOW ***
+
+  root's password on this machine has just been scrambled. You cannot
+  su to root and you were never told the new password. Regain access
+  from the boot loader and set root's password to:
+
+      redhat123
+
+  You need the VM console (SSH / sudo is not the skill being practised).
+  If serverb is headless, restart it with a window:
+
+      VBoxManage startvm serverb --type separate
+
+  Your task:
+
+    1. Reboot. At the GRUB menu, highlight the default entry, press e.
+
+    2. Find the line that starts with "linux", go to its end and append:
+
+           rd.break
+
+       Then press Ctrl-x to boot into the initramfs shell.
+
+    3. The real root filesystem is mounted read-only at /sysroot.
+       Remount it read-write and switch into it:
+
+           mount -o remount,rw /sysroot
+           chroot /sysroot
+
+    4. Set the new password:
+
+           passwd root            (enter: redhat123)
+
+    5. SELinux is enforcing, so force a relabel on the next boot - this
+       fixes the SELinux context on the changed /etc/shadow. Skip it and
+       you can be locked out:
+
+           touch /.autorelabel
+
+    6. Type "exit" twice and let the system boot. It relabels, then
+       reboots once more on its own.
+
+    7. Confirm you can log in as root with redhat123.
+
+  Grading checks that root's password is now redhat123 and that the
+  system was actually rebooted after the reset.
+
+  ----- 中文說明 -----
+
+  *** 本練習會把 root 密碼改成一個「你不知道」的值 ***
+
+  這台機器的 root 密碼剛剛被打亂了。你無法 su 成 root,也沒有人告訴
+  你新密碼。請從開機載入器(boot loader)重新取得存取權,並把 root
+  密碼設為:
+
+      redhat123
+
+  這題要用 VM 的 console(重點不是 SSH / sudo,而是開機中斷這個技能)。
+  若 serverb 是 headless 執行,請用有畫面的方式重啟:
+
+      VBoxManage startvm serverb --type separate
+
+  你的任務:
+
+    1. 重開機。在 GRUB 選單把預設項目反白,按 e 編輯。
+
+    2. 找到以 "linux" 開頭的那一行,移到行尾,加上:
+
+           rd.break
+
+       然後按 Ctrl-x 進入 initramfs shell。
+
+    3. 真正的根檔案系統以唯讀掛在 /sysroot。把它重新掛成可讀寫,
+       再 chroot 進去:
+
+           mount -o remount,rw /sysroot
+           chroot /sysroot
+
+    4. 設定新密碼:
+
+           passwd root            (輸入:redhat123)
+
+    5. SELinux 是 enforcing,所以要在下次開機時強制 relabel,修正被
+       改動的 /etc/shadow 的 SELinux context。漏了這步可能被鎖在門外:
+
+           touch /.autorelabel
+
+    6. 連打兩次 "exit" 讓系統開機。它會先 relabel,再自己重開一次。
+
+    7. 確認可以用 redhat123 以 root 登入。
+
+  評分會檢查 root 密碼現在是 redhat123,而且重設之後有真正重開過機。
+EOF
+}
+
+_root_pw_is_target() {
+    lab_password_is root "$LAB_ROOT_TARGET"
+}
+
+_root_login_usable() {
+    # Not empty, locked or disabled.
+    lab_password_set root
+}
+
+_rebooted_since_setup() {
+    [ -f "$LAB_STAMP" ] || return 1
+    local stamp boot
+    stamp=$(cat "$LAB_STAMP" 2>/dev/null)
+    boot=$(date -d "$(uptime -s)" +%s 2>/dev/null)
+    [ -n "$stamp" ] && [ -n "$boot" ] && [ "$boot" -gt "$stamp" ]
+}
+
+_system_healthy() {
+    case "$(systemctl is-system-running 2>/dev/null)" in
+        running|degraded) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+lab_setup() {
+    install -d -m 755 "$(dirname "$LAB_STAMP")"
+
+    # Scramble root's password to something the student cannot know.
+    local rnd
+    rnd=$(openssl rand -base64 18 2>/dev/null) \
+        || rnd=$(head -c 18 /dev/urandom | base64)
+    printf 'root:%s\n' "$rnd" | chpasswd
+
+    date +%s > "$LAB_STAMP"
+
+    printf '\n  %sroot'\''s password has been scrambled.%s\n' "$C_YEL" "$C_0"
+    printf '  You must reset it to "%s" from the GRUB boot loader.\n' "$LAB_ROOT_TARGET"
+    printf '  Reboot serverb (console required) to begin.\n'
+    return 0
+}
+
+lab_grade() {
+    grade_test "root's password is now redhat123"          _root_pw_is_target
+    grade_test "root's account is usable (not locked)"     _root_login_usable
+    grade_test "the system was rebooted after the reset"   _rebooted_since_setup
+    grade_test "systemd reports the system as healthy"     _system_healthy
+    grade_check "SELinux is still enforcing" \
+        '[ "$(getenforce)" = Enforcing ]'
+}
+
+lab_finish() {
+    # Restore the machine's documented root password (root / student).
+    printf 'root:student\n' | chpasswd
+    rm -f "$LAB_STAMP"
+    return 0
+}
