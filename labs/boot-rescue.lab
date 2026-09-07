@@ -88,11 +88,13 @@ _fstab_verifies() {
 }
 
 _rebooted_since_setup() {
+    # Compare the kernel boot_id captured at setup with the current one - a
+    # fresh UUID every boot, so this survives the VM's clock drifting/jumping.
     [ -f "$LAB_STAMP" ] || return 1
-    local stamp boot
-    stamp=$(cat "$LAB_STAMP" 2>/dev/null)
-    boot=$(date -d "$(uptime -s)" +%s 2>/dev/null)
-    [ -n "$stamp" ] && [ -n "$boot" ] && [ "$boot" -gt "$stamp" ]
+    local saved now
+    saved=$(cat "$LAB_STAMP" 2>/dev/null)
+    now=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+    [ -n "$saved" ] && [ -n "$now" ] && [ "$saved" != "$now" ]
 }
 
 _system_healthy() {
@@ -110,7 +112,7 @@ lab_setup() {
     install -d -m 755 "$(dirname "$LAB_STAMP")"
     install -d -m 755 "$LAB_BADMNT"
     printf 'UUID=%s %s xfs defaults 0 0\n' "$LAB_BADUUID" "$LAB_BADMNT" >> /etc/fstab
-    date +%s > "$LAB_STAMP"
+    cat /proc/sys/kernel/random/boot_id > "$LAB_STAMP"
     systemctl daemon-reload >/dev/null 2>&1
 
     printf '\n  %s/etc/fstab now contains a deliberately broken entry.%s\n' "$C_YEL" "$C_0"

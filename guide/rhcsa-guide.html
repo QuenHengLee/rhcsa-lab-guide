@@ -850,13 +850,16 @@ REPO
 <p class="note">本題把 root 密碼打亂成「你不知道」的值,要用 <strong>GRUB 開機中斷(rd.break)</strong>把它重設為 <code>redhat123</code>。這是 RHCSA 考綱明列、最經典的必考大題(對應「Interrupt the boot process to gain access」)。必須用 serverb 的 console:<br><code>VBoxManage controlvm serverb poweroff</code> → <code>VBoxManage startvm serverb --type separate</code></p></div>
 <div class="phase"><h4>② 逐步解法(init=/bin/bash 方法,在 console 操作)</h4>
 <pre class="term"><span class="c"># 1. 重開機,GRUB 選單反白預設項按 e 編輯</span>
-<span class="c"># 2. 找到 linux 開頭那行,移到行尾,加上 init=/bin/bash,按 Ctrl-x 開機</span>
-<span class="c"># 3. 核心用 bash 當 PID 1,根直接掛在 /(唯讀)——不用 /sysroot、不用 chroot:</span>
+<span class="c"># 2. 在 linux 開頭那行做兩件事:</span>
+<span class="c">#    (a) 行尾加上 init=/bin/bash</span>
+<span class="c">#    (b) 刪掉 console=tty0 console=ttyS0 兩個參數(不刪的話 shell 會跑到序列埠、打字沒反應)</span>
+<span class="c"># 3. 按 Ctrl-x 開機。核心用 bash 當 PID 1,根直接掛在 /(唯讀)——不用 /sysroot、不用 chroot:</span>
 bash-5.2# mount -o rw,remount /
 bash-5.2# passwd root          <span class="c"># 輸入 redhat123(兩次)</span>
 bash-5.2# touch /.autorelabel  <span class="c"># 關鍵!讓 SELinux 重新標記 /etc/shadow</span>
 bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(relabel 後自己重開一次)</span></pre>
-<p>三個最容易丟分的點:先 <code>mount -o rw,remount /</code> 把根改可寫、密碼設 <code>redhat123</code>、<strong>一定要 <code>touch /.autorelabel</code></strong>——漏了它,SELinux enforcing 下 /etc/shadow 標籤錯誤,重開後會登入不了(頭號陷阱)。最後用 <code>exec /sbin/init</code> 交還 systemd 開完機;若卡住改用 <code>mount -o ro,remount /</code> 再 <code>exec /sbin/reboot -f</code> 強制重開。</p></div>
+<p>四個最容易丟分的點:<strong>刪掉 <code>console=</code> 參數</strong>(留著 console=ttyS0,bash shell 綁在序列埠、畫面打字沒反應,看起來像當機)、先 <code>mount -o rw,remount /</code> 把根改可寫、密碼設 <code>redhat123</code>、<strong>一定要 <code>touch /.autorelabel</code></strong>(漏了 SELinux enforcing 下 /etc/shadow 標籤錯誤,重開後登入不了)。最後 <code>exec /sbin/init</code> 開完機;卡住改用 <code>mount -o ro,remount /</code> 再 <code>exec /sbin/reboot -f</code>。</p>
+<p class="note">本題的 <code>lab start</code> 會<strong>刻意在開機參數注入 <code>console=tty0 console=ttyS0</code></strong>,模擬真實考試環境——所以你會實際遇到「進了 bash 卻打不了字」而必須刪掉 console= 的情況(<code>lab finish</code> 會自動清掉注入的參數)。務必<strong>先 <code>lab start boot-rootpw</code> 再去 GRUB 操作</strong>:它同時記錄開機基準點,評分才能判斷你真的重開過機。</p></div>
 <div class="duo">
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># relabel 完、正常開機後,以 redhat123 登入 root:</span>
 <span class="p">#</span> lab grade boot-rootpw</pre></div>

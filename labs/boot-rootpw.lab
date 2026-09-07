@@ -26,9 +26,14 @@ lab_describe() {
 
     1. Reboot. At the GRUB menu, highlight the default entry, press e.
 
-    2. Find the line that starts with "linux", go to its end and append:
+    2. Find the line that starts with "linux". Make TWO edits on it:
 
-           init=/bin/bash
+         a. Append:  init=/bin/bash
+         b. Delete the two console= arguments (console=tty0 console=ttyS0).
+            If you leave console=ttyS0 on, the bash shell is bound to the
+            serial port and your keystrokes on this screen do nothing -
+            the shell looks frozen. Removing it puts the shell back on the
+            screen you are looking at.
 
        Then press Ctrl-x to boot. The kernel starts a bash shell as PID 1
        instead of systemd - the real root is mounted at / (read-only),
@@ -80,9 +85,13 @@ lab_describe() {
 
     1. 重開機。在 GRUB 選單把預設項目反白,按 e 編輯。
 
-    2. 找到以 "linux" 開頭的那一行,移到行尾,加上:
+    2. 找到以 "linux" 開頭的那一行,做「兩處」修改:
 
-           init=/bin/bash
+         a. 在行尾加上:  init=/bin/bash
+         b. 刪掉那兩個 console= 參數(console=tty0 console=ttyS0)。
+            若留著 console=ttyS0,bash shell 會綁在序列埠上,你在這個
+            畫面打字完全沒反應、看起來像當機。刪掉它,shell 才會回到
+            你眼前這個畫面。
 
        然後按 Ctrl-x 開機。核心會用 bash 當 PID 1(而不是 systemd),
        真正的根直接掛在 /(唯讀)——所以不需要 /sysroot、也不用 chroot。
@@ -124,11 +133,14 @@ _root_login_usable() {
 }
 
 _rebooted_since_setup() {
+    # Compare the kernel boot_id captured at setup with the current one.
+    # boot_id is a fresh UUID on every boot, so this detects a reboot without
+    # depending on wall-clock time (which drifts and jumps on a VM).
     [ -f "$LAB_STAMP" ] || return 1
-    local stamp boot
-    stamp=$(cat "$LAB_STAMP" 2>/dev/null)
-    boot=$(date -d "$(uptime -s)" +%s 2>/dev/null)
-    [ -n "$stamp" ] && [ -n "$boot" ] && [ "$boot" -gt "$stamp" ]
+    local saved now
+    saved=$(cat "$LAB_STAMP" 2>/dev/null)
+    now=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+    [ -n "$saved" ] && [ -n "$now" ] && [ "$saved" != "$now" ]
 }
 
 _system_healthy() {
@@ -147,7 +159,17 @@ lab_setup() {
         || rnd=$(head -c 18 /dev/urandom | base64)
     printf 'root:%s\n' "$rnd" | chpasswd
 
-    date +%s > "$LAB_STAMP"
+    # Add a serial console to every boot entry, with ttyS0 LAST so that it
+    # becomes /dev/console. Normal boots are unaffected (getty still runs on
+    # tty1), but an init=/bin/bash shell lands on the invisible serial port -
+    # reproducing the real exam, where you must strip a console= argument off
+    # the kernel line before the maintenance shell is usable. Removed again by
+    # lab_finish. Idempotent: clear any console= first, then add ours.
+    grubby --update-kernel=ALL --remove-args="console" >/dev/null 2>&1
+    grubby --update-kernel=ALL --args="console=tty0 console=ttyS0" >/dev/null 2>&1
+
+    # Record this boot's id so grading can tell a real reboot happened.
+    cat /proc/sys/kernel/random/boot_id > "$LAB_STAMP"
 
     printf '\n  %sroot'\''s password has been scrambled.%s\n' "$C_YEL" "$C_0"
     printf '  You must reset it to "%s" from the GRUB boot loader.\n' "$LAB_ROOT_TARGET"
@@ -167,6 +189,8 @@ lab_grade() {
 lab_finish() {
     # Restore the machine's documented root password (root / student).
     printf 'root:student\n' | chpasswd
+    # Take the practice serial console back off every boot entry.
+    grubby --update-kernel=ALL --remove-args="console" >/dev/null 2>&1
     rm -f "$LAB_STAMP"
     return 0
 }
