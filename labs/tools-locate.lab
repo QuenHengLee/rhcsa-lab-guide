@@ -1,0 +1,85 @@
+# shellcheck shell=bash
+# Source: RH124 ch.14.6 "Locate Files on a File System"
+LAB_TITLE="Locate files by name, permission and size"
+LAB_TOPIC="01 essential-tools"
+LAB_NODE="servera"
+
+LAB_DIR=/labfiles
+
+lab_describe() {
+    cat <<'EOF'
+  A directory /labfiles has been prepared with a mix of files. Use find
+  to answer three separate questions and save each result:
+
+    1. BY NAME - copy every file under /labfiles whose name contains the
+       word "report" into the directory /root/reports (create it).
+
+    2. BY PERMISSION - write the full path of every file under /labfiles
+       whose permissions are exactly 777, one per line, to
+       /root/perm777.txt
+
+    3. BY SIZE - write the full path of everything in /usr/bin larger
+       than 50 KiB, one per line, to /root/bigfiles.txt
+
+  Hints: find <dir> -name '*report*' ,  find <dir> -perm 777 ,
+         find /usr/bin -size +50k
+
+  ----- 中文說明 -----
+
+  已準備好目錄 /labfiles,裡面放了各種檔案。用 find 回答三個各自獨立
+  的問題,並各自存檔:
+
+    1. 依名稱 - 把 /labfiles 底下「名稱含 report」的每個檔案,複製到
+       目錄 /root/reports(自己建立)。
+
+    2. 依權限 - 把 /labfiles 底下「權限剛好是 777」的每個檔案完整路徑,
+       一行一個,寫入 /root/perm777.txt
+
+    3. 依大小 - 把 /usr/bin 裡「大於 50 KiB」的所有東西完整路徑,
+       一行一個,寫入 /root/bigfiles.txt
+
+  提示:find <目錄> -name '*report*'、find <目錄> -perm 777、
+        find /usr/bin -size +50k
+EOF
+}
+
+_by_name_ok() {
+    [ -f /root/reports/monthly-report.txt ] \
+    && [ -f /root/reports/sales-report.log ] \
+    && [ ! -e /root/reports/notes.txt ]
+}
+
+_perm777_ok() {
+    diff -q <(find "$LAB_DIR" -perm 777 | sort) \
+            <(sort /root/perm777.txt 2>/dev/null) >/dev/null
+}
+
+_bigfiles_ok() {
+    diff -q <(find /usr/bin -size +50k | sort) \
+            <(sort /root/bigfiles.txt 2>/dev/null) >/dev/null
+}
+
+lab_setup() {
+    rm -rf "$LAB_DIR" /root/reports /root/perm777.txt /root/bigfiles.txt
+    install -d -m 755 "$LAB_DIR" "$LAB_DIR/sub"
+    echo data > "$LAB_DIR/monthly-report.txt"
+    echo data > "$LAB_DIR/sub/sales-report.log"
+    echo data > "$LAB_DIR/notes.txt"            # decoy: no "report" in name
+    echo data > "$LAB_DIR/open.conf"
+    echo data > "$LAB_DIR/sub/wideopen.sh"
+    chmod 777 "$LAB_DIR/open.conf" "$LAB_DIR/sub/wideopen.sh"
+    chmod 644 "$LAB_DIR/notes.txt" "$LAB_DIR/monthly-report.txt"
+    printf '\n  /labfiles is ready. Answer the three find questions.\n'
+    return 0
+}
+
+lab_grade() {
+    grade_test "report-named files were collected into /root/reports" _by_name_ok
+    grade_test "/root/perm777.txt lists exactly the 777 files under /labfiles" _perm777_ok
+    grade_test "/root/bigfiles.txt lists exactly the >50KiB items in /usr/bin" _bigfiles_ok
+}
+
+lab_finish() {
+    rm -rf "$LAB_DIR" /root/reports /root/perm777.txt /root/bigfiles.txt
+    return 0
+}

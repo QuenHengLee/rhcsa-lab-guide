@@ -94,7 +94,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <div class="wrap">
 <p class="eyebrow">servera / serverb · Rocky Linux 10 · 33 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 36 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -108,13 +108,13 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 
 <h2 style="margin-top:24px">目錄</h2>
 <ul class="toc">
-  <li><a href="#t01"><span class="tno">01</span>essential-tools <span class="cnt">3 題</span></a></li>
+  <li><a href="#t01"><span class="tno">01</span>essential-tools <span class="cnt">4 題</span></a></li>
   <li><a href="#t02"><span class="tno">02</span>users-and-groups <span class="cnt">3 題</span></a></li>
   <li><a href="#t03"><span class="tno">03</span>permissions <span class="cnt">3 題</span></a></li>
   <li><a href="#t04"><span class="tno">04</span>storage <span class="cnt">5 題</span></a></li>
   <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">2 題</span></a></li>
   <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">5 題</span></a></li>
-  <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">2 題</span></a></li>
+  <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">3 題</span></a></li>
   <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">5 題</span></a></li>
   <li><a href="#t09"><span class="tno">09</span>containers <span class="cnt">1 題</span></a></li>
   <li><a href="#t10"><span class="tno">10</span>shell-scripting <span class="cnt">1 題</span></a></li>
@@ -139,6 +139,28 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls /root/found        <span class="c"># 應有 5 個 simone 的檔案</span>
 <span class="p">#</span> lab grade tools-find</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish tools-find</pre></div>
+</div></article>
+
+<article class="ex" id="tools-locate">
+<header><span class="name">tools-locate</span><h3>Locate files by name, permission, size<span class="zh">依名稱/權限/大小尋找檔案</span></h3><span class="examtag">#find #name #perm #size</span><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start tools-locate</pre>
+<p>用 find 回答三個獨立問題:① 名稱含 report 的檔案複製到 /root/reports;② 權限剛好 777 的檔案清單寫到 /root/perm777.txt;③ /usr/bin 裡大於 50KiB 的清單寫到 /root/bigfiles.txt。</p></div>
+<div class="phase"><h4>② 概念:find 的三種常用條件</h4>
+<pre class="term">-name '*report*'   <span class="c"># 依名稱(含萬用字元要加引號,防 shell 先展開)</span>
+-perm 777          <span class="c"># 依權限「剛好」777;-perm -644=至少;-perm /222=任一有寫</span>
+-size +50k         <span class="c"># 依大小 大於50KiB;-50k=小於;50k=剛好。M/G 同理</span></pre>
+<p>條件可組合(隱含 AND),再接動作 <code>-exec ... {} +</code> 或直接 <code>&gt; 檔案</code> 存清單。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> mkdir /root/reports
+<span class="p">#</span> find /labfiles -name '*report*' -exec cp -t /root/reports {} +
+<span class="p">#</span> find /labfiles -perm 777 &gt; /root/perm777.txt
+<span class="p">#</span> find /usr/bin -size +50k &gt; /root/bigfiles.txt</pre>
+<p><code>-perm 777</code> 是「剛好等於」;要「至少具備某權限」用 <code>-perm -644</code>(前面加 <code>-</code>)。<code>+50k</code> 的 k 是 KiB(1024),想用 MB 寫 <code>+1M</code>。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ls /root/reports; wc -l /root/perm777.txt /root/bigfiles.txt
+<span class="p">#</span> lab grade tools-locate</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish tools-locate</pre></div>
 </div></article>
 
 <article class="ex" id="tools-grep-tar">
@@ -598,6 +620,22 @@ UNIT
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> grep -E '^(server|pool)' /etc/chrony.conf
 <span class="p">#</span> lab grade time-chrony</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish time-chrony</pre></div>
+</div></article>
+
+<article class="ex" id="net-hostname">
+<header><span class="name">net-hostname</span><h3>Hostname and /etc/hosts resolution<span class="zh">主機名稱與 /etc/hosts 解析</span></h3><span class="examtag">#hostname #hosts</span><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start net-hostname</pre>
+<p>① 把靜態主機名稱設為 <code>server1.example.com</code>(重開仍有效);② 在 /etc/hosts 加一筆,讓 <code>fileserver</code> 解析為 <code>172.25.250.20</code>(不透過 DNS)。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> hostnamectl set-hostname server1.example.com
+<span class="p">#</span> echo '172.25.250.20  fileserver' &gt;&gt; /etc/hosts</pre>
+<p>兩個關鍵:主機名一定用 <code>hostnamectl set-hostname</code>(寫進設定、重開仍在),不要用暫時性的 <code>hostname xxx</code>;「不用 DNS 的名稱解析」就是寫 <code>/etc/hosts</code>——一行「IP 空白 名稱」。驗證用 <code>getent hosts fileserver</code>(它會走 /etc/hosts)。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> hostnamectl status | head -1
+<span class="p">#</span> getent hosts fileserver
+<span class="p">#</span> lab grade net-hostname</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish net-hostname</pre></div>
 </div></article>
 </section>
 

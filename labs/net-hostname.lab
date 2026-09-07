@@ -1,0 +1,79 @@
+# shellcheck shell=bash
+# Source: RH124 ch.18.6 "Configure Hostnames and Name Resolution"
+LAB_TITLE="Set the hostname and a static name resolution entry"
+LAB_TOPIC="07 network-and-time"
+LAB_NODE="servera"
+
+LAB_HOSTNAME=server1.example.com
+LAB_HOSTS_IP=172.25.250.20
+LAB_HOSTS_NAME=fileserver
+LAB_ORIG=/var/lib/rhcsa-labs/net-hostname.orig
+
+lab_describe() {
+    cat <<'EOF'
+  Configure the hostname and static name resolution on this machine:
+
+    1. Set the system's static hostname to:
+
+           server1.example.com
+
+       It must persist across reboots - use hostnamectl, not the plain
+       "hostname" command (which only lasts until the next reboot).
+
+    2. Add a static entry to /etc/hosts so the name "fileserver" resolves
+       to 172.25.250.20, without using DNS.
+
+  Verify with:  hostnamectl status
+                getent hosts fileserver
+
+  ----- 中文說明 -----
+
+  設定這台機器的主機名稱與靜態名稱解析:
+
+    1. 把系統的靜態主機名稱設為:
+
+           server1.example.com
+
+       必須重開機後仍有效——用 hostnamectl,不要用普通的 hostname
+       指令(那只撐到下次重開機)。
+
+    2. 在 /etc/hosts 加一筆靜態對應,讓名稱「fileserver」解析為
+       172.25.250.20,不透過 DNS。
+
+  驗證:hostnamectl status
+        getent hosts fileserver
+EOF
+}
+
+_hostname_ok() {
+    [ "$(hostnamectl --static 2>/dev/null)" = "$LAB_HOSTNAME" ]
+}
+
+_hosts_entry_ok() {
+    getent hosts "$LAB_HOSTS_NAME" 2>/dev/null | grep -qw "$LAB_HOSTS_IP"
+}
+
+lab_setup() {
+    install -d -m 755 "$(dirname "$LAB_ORIG")"
+    # Save the machine's real hostname so lab_finish can put it back.
+    [ -f "$LAB_ORIG" ] || hostnamectl --static > "$LAB_ORIG"
+    # Remove any prior fileserver line so the exercise is repeatable.
+    sed -i "/[[:space:]]$LAB_HOSTS_NAME\([[:space:]]\|\$\)/d" /etc/hosts
+    printf '\n  Set the static hostname to server1.example.com and add the hosts entry.\n'
+    return 0
+}
+
+lab_grade() {
+    grade_test "the static hostname is server1.example.com" _hostname_ok
+    grade_test "fileserver resolves to 172.25.250.20 via /etc/hosts" _hosts_entry_ok
+}
+
+lab_finish() {
+    # Restore the machine's original hostname.
+    if [ -f "$LAB_ORIG" ]; then
+        hostnamectl set-hostname "$(cat "$LAB_ORIG")"
+        rm -f "$LAB_ORIG"
+    fi
+    sed -i "/[[:space:]]$LAB_HOSTS_NAME\([[:space:]]\|\$\)/d" /etc/hosts
+    return 0
+}
