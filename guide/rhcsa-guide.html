@@ -97,9 +97,9 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </style>
 
 <div class="wrap">
-<p class="eyebrow">servera / serverb · Rocky Linux 10 · 33 exercises</p>
+<p class="eyebrow">servera / serverb · Rocky Linux 10 · 37 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 37 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -648,7 +648,7 @@ UNIT
 <section class="topic" id="t08"><h2><span class="no">08</span>security 安全</h2>
 
 <article class="ex" id="sec-firewall">
-<header><span class="name">sec-firewall</span><h3>firewalld ports and services<span class="zh">firewalld 開關服務與埠</span></h3><span class="node">servera</span></header>
+<header><span class="name">sec-firewall</span><h3>firewalld ports and services<span class="zh">firewalld 開關服務與埠</span></h3><span class="examtag">#防火牆 #加開port</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sec-firewall</pre>
 <p>public zone:允許 http 服務與 8080/tcp、移除 cockpit、保留 ssh;全部要永久生效並立即套用。</p></div>
@@ -657,7 +657,8 @@ UNIT
 <span class="p">#</span> firewall-cmd --permanent --add-port=8080/tcp
 <span class="p">#</span> firewall-cmd --permanent --remove-service=cockpit
 <span class="p">#</span> firewall-cmd --reload</pre>
-<p>養成習慣:每條都帶 <code>--permanent</code>,最後 <code>--reload</code> 讓永久設定變成現行設定——一次到位,runtime 與 permanent 保證一致。</p></div>
+<p>養成習慣:每條都帶 <code>--permanent</code>,最後 <code>--reload</code> 讓永久設定變成現行設定——一次到位,runtime 與 permanent 保證一致。</p>
+<p class="note">⚠️ <strong>考情註記:考試考的是加開 <code>82/tcp</code></strong>(<code>firewall-cmd --permanent --add-port=82/tcp</code> 然後 <code>--reload</code>)。本題練 8080 只是數字不同,指令一模一樣;常和「httpd 改聽 82 埠 + SELinux 埠標籤」(見 sec-selinux-httpd)是同一大題的連環步驟。</p></div>
 <div class="duo">
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> firewall-cmd --list-all
 <span class="p">#</span> lab grade sec-firewall</pre></div>
@@ -920,26 +921,6 @@ REPO
 </div>
 <p class="note">評分會檢查這個 remote 確實在 flatpakuser 的<strong>使用者層級</strong>設定裡、指向 Flathub,而且<strong>沒有</strong>加到系統層級——用 root 或漏了 <code>--user</code> 都會被抓出來。</p></article>
 
-<article class="ex" id="boot-rescue">
-<header><span class="name">boot-rescue</span><h3>Repair an unbootable system<span class="zh">修復無法開機的系統</span></h3><span class="node">servera(需 console)</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start boot-rescue</pre>
-<p class="note">本題會「蓄意」讓下次開機失敗,而且卡住期間 SSH 連不上——必須用 VM 的 console 視窗操作。開始前先在 Windows 上把 servera 改成有畫面的模式:<br><code>VBoxManage controlvm servera poweroff</code> → <code>VBoxManage startvm servera --type separate</code></p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="c"># (console 中)重開機,看它掉進 emergency mode:</span>
-<span class="p">#</span> systemctl reboot
-<span class="c"># emergency shell 以 root 登入(密碼 student),然後:</span>
-<span class="p">#</span> mount -o remount,rw /
-<span class="p">#</span> vi /etc/fstab            <span class="c"># 刪掉指向不存在裝置的那一行</span>
-<span class="p">#</span> findmnt --verify          <span class="c"># 確認沒有其他錯誤</span>
-<span class="p">#</span> systemctl reboot          <span class="c"># 應正常開機</span></pre>
-<p>emergency mode 的根檔案系統是唯讀的,不先 remount rw 就存不了檔。原始 fstab 備份在 <code>/var/lib/rhcsa-labs/fstab.orig</code> 可比對。評分要求「修好之後真的重開過機」——別跳過最後一步。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># 正常開機後登入:</span>
-<span class="p">#</span> lab grade boot-rescue</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish boot-rescue</pre></div>
-</div></article>
-
 <article class="ex" id="boot-rootpw">
 <header><span class="name">boot-rootpw</span><h3>Reset a lost root password<span class="zh">重設遺失的 root 密碼</span></h3><span class="examtag">#root密碼</span><span class="node">serverb(需 console)</span></header>
 <div class="phase"><h4>① 啟動</h4>
@@ -956,13 +937,13 @@ bash-5.2# passwd root          <span class="c"># 輸入 redhat123(兩次)</span>
 bash-5.2# touch /.autorelabel  <span class="c"># 關鍵!讓 SELinux 重新標記 /etc/shadow</span>
 bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(relabel 後自己重開一次)</span></pre>
 <p>四個最容易丟分的點:<strong>刪掉 <code>console=</code> 參數</strong>(留著 console=ttyS0,bash shell 綁在序列埠、畫面打字沒反應,看起來像當機)、先 <code>mount -o rw,remount /</code> 把根改可寫、密碼設 <code>redhat123</code>、<strong>一定要 <code>touch /.autorelabel</code></strong>(漏了 SELinux enforcing 下 /etc/shadow 標籤錯誤,重開後登入不了)。最後 <code>exec /sbin/init</code> 開完機;卡住改用 <code>mount -o ro,remount /</code> 再 <code>exec /sbin/reboot -f</code>。</p>
-<p class="note">本題的 <code>lab start</code> 會<strong>刻意在開機參數注入 <code>console=tty0 console=ttyS0</code></strong>,模擬真實考試環境——所以你會實際遇到「進了 bash 卻打不了字」而必須刪掉 console= 的情況(<code>lab finish</code> 會自動清掉注入的參數)。務必<strong>先 <code>lab start boot-rootpw</code> 再去 GRUB 操作</strong>:它同時記錄開機基準點,評分才能判斷你真的重開過機。</p></div>
+<p class="note">⚠️ <strong>考情註記:真實考試的開機參數裡「沒有」<code>console=</code> 這段</strong>——考場上不用刪任何東西,直接在行尾加 <code>init=/bin/bash</code> 就好。本 lab 的 <code>lab start</code> 是刻意注入 <code>console=tty0 console=ttyS0</code> 增加難度(在這裡練習時才需要刪掉它;<code>lab finish</code> 會自動清掉注入的參數)。務必<strong>先 <code>lab start boot-rootpw</code> 再去 GRUB 操作</strong>:它同時記錄開機基準點,評分才能判斷你真的重開過機。</p></div>
 <div class="duo">
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># relabel 完、正常開機後,以 redhat123 登入 root:</span>
 <span class="p">#</span> lab grade boot-rootpw</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish boot-rootpw</pre></div>
 </div>
-<p class="note">和 boot-rescue 的差別:emergency mode <strong>要先知道 root 密碼</strong>才進得去;<code>init=/bin/bash</code> 是在 GRUB 直接把 PID 1 換成 bash、跳過登入,<strong>不需密碼</strong>,正是給「連 root 密碼都不知道」用的。兩題操作不同,別搞混。<br><strong>另一種等效教法</strong>是 <code>rd.break</code>(進 initramfs,根在 <code>/sysroot</code>、需 <code>chroot</code>),殊途同歸;克能老師教的 <code>init=/bin/bash</code> 好處是根直接在 <code>/</code>、少一步 chroot。</p></article>
+<p class="note">和救援用的 emergency mode 的差別:emergency mode <strong>要先知道 root 密碼</strong>才進得去;<code>init=/bin/bash</code> 是在 GRUB 直接把 PID 1 換成 bash、跳過登入,<strong>不需密碼</strong>,正是給「連 root 密碼都不知道」用的。兩者別搞混。<br><strong>另一種等效教法</strong>是 <code>rd.break</code>(進 initramfs,根在 <code>/sysroot</code>、需 <code>chroot</code>),殊途同歸;克能老師教的 <code>init=/bin/bash</code> 好處是根直接在 <code>/</code>、少一步 chroot。</p></article>
 </section>
 
 <section id="notest">
@@ -970,6 +951,8 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
 <ul>
 <li><strong>vgreduce</strong> — 從 Volume Group 移除實體磁碟(PV)。LVM 只考建立與擴充(pvcreate / vgcreate / vgextend / lvcreate / lvextend),縮減方向不考。</li>
 <li><strong>autofs direct map(直接對映)</strong> — 老師說只考自動掛載的間接對映(indirect map),見 nfs-autofs 題。</li>
+<li><strong>手動掛載 NFS 匯出目錄</strong> — <code>mount -t nfs</code> 或寫 /etc/fstab 掛 NFS 不考;NFS 只考 autofs 自動掛載那一種。</li>
+<li><strong>Control and troubleshoot the boot process</strong> — 開機流程管理與疑難排解不考(原 boot-rescue 題:emergency mode 修 fstab,已自手冊移除;lab 環境仍可用 <code>lab start boot-rescue</code> 練習)。<strong>但 recover root password 必考</strong>,見 boot-rootpw 題。</li>
 </ul>
 </section>
 
