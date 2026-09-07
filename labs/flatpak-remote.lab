@@ -1,0 +1,98 @@
+# shellcheck shell=bash
+# Source: RH124 ch.13 "Install and Update Software" - Flatpak
+LAB_TITLE="Add a Flatpak remote for one user only"
+LAB_TOPIC="12 software + boot"
+LAB_NODE="servera"
+
+LAB_USER=flatpakuser
+LAB_REMOTE=flathub
+LAB_USERCFG=/home/flatpakuser/.local/share/flatpak/repo/config
+
+lab_describe() {
+    cat <<'EOF'
+  The user "flatpakuser" already exists. Working AS THAT USER (not root,
+  not system-wide), configure Flatpak so that:
+
+    1. A Flatpak remote named "flathub" is added, pointing at the Flathub
+       repository (https://flathub.org/repo/flathub.flatpakrepo).
+
+    2. It is a USER-level remote - it must belong to flatpakuser only, not
+       to the whole system. Use the --user option.
+
+  Do the work as flatpakuser (for example: su - flatpakuser). A remote
+  added with --user lives under the user's own home, so root's
+  "flatpak remotes --system" must NOT list it.
+
+  Verify as flatpakuser with:  flatpak remotes --user
+
+  ----- 中文說明 -----
+
+  使用者「flatpakuser」已存在。請「以該使用者身分」(不是 root、也
+  不是系統層級)設定 Flatpak,使得:
+
+    1. 新增一個名為「flathub」的 Flatpak remote(套件來源),指向
+       Flathub(https://flathub.org/repo/flathub.flatpakrepo)。
+
+    2. 它是「使用者層級(--user)」的 remote——只屬於 flatpakuser,
+       不是整台系統共用。要用 --user 選項。
+
+  請以 flatpakuser 身分操作(例如:su - flatpakuser)。用 --user 加的
+  remote 放在該使用者自己的家目錄下,所以 root 的
+  「flatpak remotes --system」不該列得出它。
+
+  以 flatpakuser 身分驗證:flatpak remotes --user
+EOF
+}
+
+_flatpak_installed() {
+    rpm -q flatpak
+}
+
+_user_exists() {
+    id "$LAB_USER"
+}
+
+_remote_user_scoped() {
+    [ -f "$LAB_USERCFG" ] && grep -q "\[remote \"$LAB_REMOTE\"\]" "$LAB_USERCFG"
+}
+
+_remote_points_flathub() {
+    [ -f "$LAB_USERCFG" ] || return 1
+    # url= sits a few lines under the [remote "flathub"] stanza.
+    awk -v r="[remote \"$LAB_REMOTE\"]" '
+        $0==r {inb=1; next}
+        /^\[/ {inb=0}
+        inb && tolower($0) ~ /url=.*flathub/ {found=1}
+        END {exit !found}
+    ' "$LAB_USERCFG"
+}
+
+_not_system_wide() {
+    ! flatpak remotes --system 2>/dev/null | awk '{print $1}' | grep -qx "$LAB_REMOTE"
+}
+
+lab_setup() {
+    lab_ensure_pkg flatpak
+    # Fresh user so no stale flatpak config lingers.
+    lab_user_del "$LAB_USER"
+    useradd "$LAB_USER" || return 1
+    # Make sure no system-wide flathub is left over from a previous attempt.
+    flatpak remote-delete --system "$LAB_REMOTE" >/dev/null 2>&1
+    printf '\n  Work as %s (su - %s) and add the flathub remote with --user.\n' \
+        "$LAB_USER" "$LAB_USER"
+    return 0
+}
+
+lab_grade() {
+    grade_test "flatpak is installed"                         _flatpak_installed
+    grade_test "the user flatpakuser exists"                  _user_exists
+    grade_test "a user-level remote 'flathub' was added"      _remote_user_scoped
+    grade_test "the remote points at the Flathub repository"  _remote_points_flathub
+    grade_test "it was NOT added system-wide"                 _not_system_wide
+}
+
+lab_finish() {
+    flatpak remote-delete --system "$LAB_REMOTE" >/dev/null 2>&1
+    lab_user_del "$LAB_USER"
+    return 0
+}

@@ -94,7 +94,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <div class="wrap">
 <p class="eyebrow">servera / serverb · Rocky Linux 10 · 33 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 35 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 36 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -119,7 +119,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
   <li><a href="#t09"><span class="tno">09</span>containers <span class="cnt">1 題</span></a></li>
   <li><a href="#t10"><span class="tno">10</span>shell-scripting <span class="cnt">1 題</span></a></li>
   <li><a href="#t11"><span class="tno">11</span>processes-and-logs <span class="cnt">2 題</span></a></li>
-  <li><a href="#t12"><span class="tno">12</span>software + boot <span class="cnt">3 題</span></a></li>
+  <li><a href="#t12"><span class="tno">12</span>software + boot <span class="cnt">4 題</span></a></li>
 </ul>
 
 <!-- ============ 01 ============ -->
@@ -850,6 +850,30 @@ REPO
 <span class="p">#</span> lab grade dnf-repo</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish dnf-repo</pre></div>
 </div></article>
+
+<article class="ex" id="flatpak-remote">
+<header><span class="name">flatpak-remote</span><h3>Add a Flatpak remote for one user<span class="zh">為單一使用者加 Flatpak remote</span></h3><span class="examtag">#flatpak #--user</span><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start flatpak-remote</pre>
+<p>以 <strong>flatpakuser 身分</strong>(不是 root、不是系統層級)加一個名為 <code>flathub</code> 的 Flatpak remote,指向 Flathub,而且必須是 <strong>--user 使用者層級</strong>——只屬於這個使用者。</p></div>
+<div class="phase"><h4>② 概念:Flatpak remote 是什麼、--user vs --system</h4>
+<p>Flatpak 是另一套裝軟體的方式(跟 dnf 並行)。<strong>remote</strong> = 軟體來源(類似 dnf 的 repo);<strong>Flathub</strong> 是最大的公開 remote。加來源用 <code>flatpak remote-add</code>,關鍵是層級:</p>
+<pre class="term">--user     <span class="c"># 只給「這個使用者」,存在 ~/.local/share/flatpak,不需 root</span>
+--system   <span class="c"># 全系統共用,需 root</span></pre>
+<p>題目說「set user only / 只給該使用者用」→ 一定要帶 <code>--user</code>。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> dnf -y install flatpak          <span class="c"># 沒裝的話先裝</span>
+<span class="p">#</span> su - flatpakuser                 <span class="c"># ★ 切成該使用者操作</span>
+<span class="p">$</span> flatpak remote-add --user flathub \
+      https://flathub.org/repo/flathub.flatpakrepo</pre>
+<p>兩個丟分點:① 忘了 <code>--user</code> 就變成系統層級,不符合「只給該使用者」;② 忘了先 <code>su - flatpakuser</code>,用 root 加就加錯人了。加來源不需要真的裝 app。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> flatpak remotes --user    <span class="c"># 應列出 flathub</span>
+<span class="p">$</span> exit
+<span class="p">#</span> lab grade flatpak-remote</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish flatpak-remote</pre></div>
+</div>
+<p class="note">評分會檢查這個 remote 確實在 flatpakuser 的<strong>使用者層級</strong>設定裡、指向 Flathub,而且<strong>沒有</strong>加到系統層級——用 root 或漏了 <code>--user</code> 都會被抓出來。</p></article>
 
 <article class="ex" id="boot-rescue">
 <header><span class="name">boot-rescue</span><h3>Repair an unbootable system<span class="zh">修復無法開機的系統</span></h3><span class="node">servera(需 console)</span></header>
