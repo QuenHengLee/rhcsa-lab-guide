@@ -1,0 +1,207 @@
+<title>man 手冊速成</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F7F8F6; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --line:#DDE4DF; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --key-bg:#FFFFFF; --key-line:#C4CFC8; --key-ink:#243029;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A; --term-hl:#E4C57C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:34px;font-weight:700;margin:0 0 6px}
+h2{font-size:21px;font-weight:700;margin:0 0 4px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px;letter-spacing:.05em}
+.sub{color:var(--muted);margin:0 0 8px;max-width:66ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.92em;background:var(--chip);padding:1px 6px;border-radius:4px}
+section{margin-top:48px;border-top:2px solid var(--accent);padding-top:12px}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;
+  padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative;
+  font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+pre.term .hl{color:var(--term-hl)}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px;max-width:72ch}
+.note code{background:transparent;color:inherit;padding:0}
+kbd{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.85em;font-weight:600;
+  background:var(--key-bg);color:var(--key-ink);border:1px solid var(--key-line);
+  border-bottom-width:2px;border-radius:5px;padding:1px 7px;min-width:1.4em;text-align:center}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;margin:14px 0;font-size:14.5px;width:100%}
+th,td{border:1px solid var(--line);padding:8px 13px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+td:first-child{white-space:nowrap}
+/* section-number pill for man sections */
+.secgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
+.seccard{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+.seccard .n{display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:7px;background:var(--accent-soft);color:var(--accent-ink);
+  font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;margin-bottom:8px}
+.seccard b{display:block;font-size:14.5px}
+.seccard span{font-size:12.5px;color:var(--muted)}
+.seccard.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+/* keyboard cheat rows */
+.keys{display:flex;flex-direction:column;gap:2px;margin:12px 0;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 4px;overflow:hidden}
+.keyrow{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:baseline;
+  padding:7px 14px;border-radius:6px}
+.keyrow:nth-child(odd){background:var(--chip)}
+.keyrow .k{text-align:left}
+.keyrow .d{font-size:14.5px}
+.keyrow .d small{color:var(--muted)}
+figure{margin:16px 0}
+figure svg{display:block;max-width:100%;height:auto}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.7}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:16px 0}
+.flow .step{flex:1 1 150px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+.flow .step .t{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);letter-spacing:.05em}
+.flow .step .b{font-size:14px;margin-top:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* copy button */
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;
+  color:var(--term-ink);background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · 考場可查文件 · 不用背,會查就好</p>
+<h1>man 手冊速成</h1>
+<p class="sub">RHCSA 考試不能上網,但<strong>系統內建的 man 手冊可以查</strong>。指令選項、設定檔格式、甚至可直接照抄的範例,全都在裡面。與其死背,不如把「怎麼快速查到答案」練成反射動作——這頁教你這件事。</p>
+
+<!-- ============ 1 ============ -->
+<section>
+<h2><span class="no">1</span>man 是什麼、怎麼開</h2>
+<p class="sub"><code>man</code> = <strong>man</strong>ual(手冊)。每個指令、設定檔、系統呼叫都有一份說明文件,<code>man 名字</code> 就能打開來讀。</p>
+<pre class="term"><span class="p">$</span> man ls          <span class="c"># 讀 ls 指令的手冊</span>
+<span class="p">$</span> man passwd      <span class="c"># 讀 passwd 指令的手冊</span>
+<span class="p">$</span> man fstab       <span class="c"># 讀 /etc/fstab 設定檔的格式說明</span></pre>
+<p>打開後是一份可上下捲動的文件(用 <code>less</code> 顯示),按 <kbd>q</kbd> 離開。文件結構固定,認得幾個標題就能快速跳到要看的地方:</p>
+<div class="tablebox"><table>
+<tr><th>段落標題</th><th>裡面有什麼</th></tr>
+<tr><td>NAME</td><td>一句話說明這是什麼</td></tr>
+<tr><td>SYNOPSIS</td><td>指令怎麼下、參數順序</td></tr>
+<tr><td>DESCRIPTION</td><td>詳細說明</td></tr>
+<tr><td><strong>OPTIONS</strong></td><td><strong>每個選項(-R、-v…)的意義</strong>——查旗標看這裡</td></tr>
+<tr><td><strong>EXAMPLES</strong></td><td><strong>可直接照抄的範例指令</strong>——考場救星,通常在最底部</td></tr>
+<tr><td>SEE ALSO</td><td>相關的其他手冊(附章節編號,見第 3 節)</td></tr>
+</table></div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section>
+<h2><span class="no">2</span>在 man 裡面移動:less 快捷鍵</h2>
+<p class="sub">man 用 <code>less</code> 這個閱讀器顯示,所以以下按鍵在任何 man 頁都通用。<strong>最該記的是 <kbd>/</kbd> 搜尋和 <kbd>G</kbd> 跳到底</strong>——這兩個讓你不用逐頁捲。</p>
+<div class="keys">
+<div class="keyrow"><span class="k"><kbd>/</kbd> 字串 <kbd>Enter</kbd></span><span class="d">往下<strong>搜尋</strong>關鍵字 <small>— 例如 <code>/EXAMPLES</code> 直接跳到範例段;<code>/-R</code> 找 -R 選項</small></span></div>
+<div class="keyrow"><span class="k"><kbd>n</kbd> / <kbd>N</kbd></span><span class="d">跳到<strong>下一個 / 上一個</strong>搜尋結果</span></div>
+<div class="keyrow"><span class="k"><kbd>G</kbd></span><span class="d">跳到<strong>最底部</strong> <small>— EXAMPLES 通常在這;記法「大寫 G 力氣大,衝到底」</small></span></div>
+<div class="keyrow"><span class="k"><kbd>g</kbd></span><span class="d">跳到<strong>最頂端</strong></span></div>
+<div class="keyrow"><span class="k"><kbd>Space</kbd> / <kbd>f</kbd></span><span class="d">往下翻一頁</span></div>
+<div class="keyrow"><span class="k"><kbd>b</kbd></span><span class="d">往上翻一頁</span></div>
+<div class="keyrow"><span class="k"><kbd>↑</kbd> <kbd>↓</kbd></span><span class="d">上下一行</span></div>
+<div class="keyrow"><span class="k"><kbd>q</kbd></span><span class="d"><strong>離開</strong> man,回到指令列</span></div>
+</div>
+<div class="note"><strong>大小寫有意義:</strong><kbd>G</kbd> 到底、<kbd>g</kbd> 到頂;<kbd>n</kbd> 順著找、<kbd>N</kbd> 倒著找。搜尋跳過頭時,<kbd>N</kbd> 往回退一個結果即可。</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section>
+<h2><span class="no">3</span>括號裡的數字:手冊章節</h2>
+<p class="sub">同一個名字可能在多個「章節」都有手冊(例如 <code>crontab</code> 既是指令、又是設定檔)。<code>SEE ALSO</code> 裡看到的 <code>fstab(5)</code>、<code>semanage-port(8)</code>,括號數字就是章節編號。</p>
+<div class="secgrid">
+<div class="seccard"><span class="n">1</span><b>一般指令</b><span>ls、grep、cp…</span></div>
+<div class="seccard hot"><span class="n">5</span><b>設定檔格式</b><span>fstab、sudoers、crontab</span></div>
+<div class="seccard hot"><span class="n">8</span><b>系統管理指令</b><span>useradd、semanage…</span></div>
+<div class="seccard"><span class="n">2/3</span><b>程式函式</b><span>寫程式才用</span></div>
+<div class="seccard"><span class="n">7</span><b>雜項慣例</b><span>regex、glob…</span></div>
+</div>
+<p class="sub">RHCSA 只要記 <strong>1、5、8</strong>。撞名時在 <code>man</code> 和名字中間加章節數字,指定要哪一份:</p>
+<pre class="term"><span class="p">$</span> man crontab       <span class="c"># 開到 crontab(1):指令怎麼用</span>
+<span class="p">$</span> man 5 crontab     <span class="c"># 開到 crontab(5):五個時間欄位的格式 ← 排程題要看這個</span>
+<span class="p">$</span> man 5 fstab       <span class="c"># fstab 六欄位怎麼寫</span></pre>
+<div class="note"><strong>第 5 章是考試最值錢的章節。</strong>所有「這個設定檔裡面該怎麼寫」的答案都在第 5 章:<code>man 5 fstab</code>、<code>man 5 crontab</code>、<code>man 5 sudoers</code>、<code>man 5 chrony.conf</code>…寫設定檔卡住,先想到它。</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section>
+<h2><span class="no">4</span>忘記指令叫什麼?用關鍵字反查</h2>
+<p class="sub">知道「要做什麼」卻想不起「指令叫什麼」時,用 <code>man -k</code>(等同 <code>apropos</code>)拿關鍵字去搜所有手冊的簡介。</p>
+<pre class="term"><span class="p">$</span> man -k passwd          <span class="c"># 所有和 passwd 有關的手冊</span>
+<span class="p">$</span> man -k <span class="hl">time</span> | grep 8    <span class="c"># 只看第 8 章(管理指令)裡和 time 有關的</span>
+<span class="p">$</span> man -k selinux         <span class="c"># 找出所有 SELinux 相關指令</span></pre>
+<div class="note">若 <code>man -k</code> 回「nothing appropriate」,先跑一次 <code>sudo mandb</code> 重建索引再試——考試機偶爾需要這一步。</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section>
+<h2><span class="no">5</span>考場黃金動線</h2>
+<p class="sub">把這條路徑練成反射:不會的指令 → man 開 → 搜到範例 → 照抄改路徑。整個過程不到十秒。</p>
+<div class="flow">
+<div class="step"><div class="t">① 開</div><div class="b"><code>man 指令名</code></div></div>
+<div class="step"><div class="t">② 跳</div><div class="b">按 <kbd>G</kbd> 到底,或 <kbd>/</kbd><code>EXAMPLES</code></div></div>
+<div class="step"><div class="t">③ 抄</div><div class="b">照範例改成你的路徑/參數</div></div>
+<div class="step"><div class="t">④ 退</div><div class="b">按 <kbd>q</kbd> 回指令列執行</div></div>
+</div>
+<p class="sub">實例——SELinux 檔案標籤題(sec-selinux-fix)忘了 <code>semanage fcontext</code> 語法:</p>
+<pre class="term"><span class="p">$</span> man semanage-fcontext
+<span class="c">  (按 G 跳到底,EXAMPLES 段就有這行可抄:)</span>
+<span class="hl">  semanage fcontext -a -t httpd_sys_content_t "/web(/.*)?"</span>
+<span class="c">  (按 q 離開,把 /web 改成你的目錄 /lab-content 就是答案)</span></pre>
+<div class="note"><strong>會查 man = 少背一半的東西。</strong>RHCSA 不考「你記不記得語法」,考「你做不做得出來」。語法忘了不扣分,查得到、做得對就給分——所以與其硬背 <code>(/.*)?</code> 這種細節,不如把「<code>man</code> → <kbd>G</kbd> → 照抄」練熟。</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section>
+<h2><span class="no">6</span>常用速查表</h2>
+<div class="tablebox"><table>
+<tr><th>想做的事</th><th>指令</th></tr>
+<tr><td>讀某指令的手冊</td><td><code>man useradd</code></td></tr>
+<tr><td>讀某設定檔的格式</td><td><code>man 5 fstab</code>(指定第 5 章)</td></tr>
+<tr><td>關鍵字反查指令名</td><td><code>man -k 關鍵字</code></td></tr>
+<tr><td>只看一段簡短說明</td><td><code>whatis 指令</code>(一行摘要)</td></tr>
+<tr><td>看指令的內建說明</td><td><code>指令 --help</code>(比 man 短,速查用)</td></tr>
+<tr><td>man 索引壞掉/查不到</td><td><code>sudo mandb</code> 重建</td></tr>
+<tr><td>SELinux 專屬說明頁</td><td><code>man semanage-fcontext</code>、<code>man httpd_selinux</code></td></tr>
+</table></div>
+<p class="note">補充:很多服務有專屬的 SELinux 手冊,例如 <code>man httpd_selinux</code>、<code>man nfs_selinux</code>——裡面直接列出該服務所有相關的 boolean 和檔案標籤,SELinux 題卡住時是一座金礦。這些頁面由 <code>selinux-policy-doc</code> 套件提供,考試機通常已裝。</p>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗';
+        if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});
+      }else{
+        var ta=document.createElement('textarea');ta.value=text;
+        ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+        var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+        document.body.removeChild(ta);done(ok);
+      }
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

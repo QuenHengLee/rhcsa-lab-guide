@@ -1,0 +1,220 @@
+<title>NFS 與 autofs 圖解</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F6F7F5; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --blue:#2C6E9B; --blue-soft:#DCEAF3;
+  --line:#DCE3DE; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A; --term-hl:#E4C57C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:840px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:33px;font-weight:700;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 8px;max-width:64ch;font-size:16.5px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.9em;background:var(--chip);padding:1px 6px;border-radius:4px}
+h2{font-size:21px;font-weight:700;margin:0 0 4px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px}
+section{margin-top:46px;border-top:2px solid var(--accent);padding-top:14px}
+.sub{color:var(--muted);margin:0 0 8px;max-width:70ch}
+figure{margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 18px 12px;overflow-x:auto}
+figure svg{display:block;max-width:100%;height:auto;margin:0 auto}
+figcaption{font-size:13.5px;color:var(--muted);margin-top:10px;max-width:74ch;line-height:1.7}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;
+  padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative;
+  font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+pre.term .hl{color:var(--term-hl)}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.note code{background:transparent;color:inherit;padding:0}
+.tablebox{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;font-size:14.5px;width:100%}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;
+  color:var(--term-ink);background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · network-filesystems · nfs-autofs</p>
+<h1>NFS 與 autofs 圖解</h1>
+<p class="lede">這題把兩個東西串在一起:<strong>NFS</strong> 讓一台機器把目錄「分享」到網路上,另一台掛來用;<strong>autofs</strong> 讓這個掛載變成「進去才掛、閒置就卸」的自動化。這頁把兩者的機制畫出來,再對照到 servera / serverb 的實作。</p>
+
+<!-- ============ 1 · NFS ============ -->
+<section>
+<h2><span class="no">1</span>NFS:把目錄分享到網路上</h2>
+<p class="sub">NFS(Network File System)讓「伺服器」把某個目錄<strong>匯出(export)</strong>,其他「用戶端」就能把它掛載到自己的目錄樹裡,像本機資料夾一樣讀寫——檔案其實一直在伺服器上。</p>
+<figure>
+<svg viewBox="0 0 800 220" role="img" aria-label="serverb 匯出 /rhome,servera 透過 NFS 把 /rhome/remoteuser1 掛到自己的目錄樹">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2C6E9B"/></marker></defs>
+<!-- serverb -->
+<rect x="24" y="46" width="250" height="128" rx="10" fill="var(--blue-soft)" stroke="#2C6E9B" stroke-width="1.6"/>
+<text x="149" y="72" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="14" font-weight="600" fill="#1E2622">serverb（NFS 伺服器）</text>
+<rect x="52" y="90" width="194" height="60" rx="7" fill="#fff" stroke="#2C6E9B" stroke-width="1.2"/>
+<text x="149" y="112" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="13" fill="#1E2622">/rhome</text>
+<text x="149" y="132" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="11.5" fill="#5B6B62">匯出(/etc/exports)</text>
+<!-- arrow -->
+<line x1="278" y1="110" x2="520" y2="110" stroke="#2C6E9B" stroke-width="1.8" marker-end="url(#ar)"/>
+<text x="399" y="98" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="12" fill="#2C6E9B">NFS over network</text>
+<text x="399" y="130" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="11.5" fill="#5B6B62">檔案留在 serverb,只是「借看」</text>
+<!-- servera -->
+<rect x="524" y="46" width="252" height="128" rx="10" fill="var(--accent-soft)" stroke="#0E7C5B" stroke-width="1.6"/>
+<text x="650" y="72" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="14" font-weight="600" fill="#1E2622">servera（用戶端）</text>
+<rect x="552" y="90" width="196" height="60" rx="7" fill="#fff" stroke="#0E7C5B" stroke-width="1.2"/>
+<text x="650" y="112" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="12.5" fill="#1E2622">/rhome/remoteuser1</text>
+<text x="650" y="132" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="11.5" fill="#5B6B62">掛載後在這裡看到內容</text>
+</svg>
+<figcaption>NFS 的角色分工:<strong>serverb 匯出</strong>(靠 <code>/etc/exports</code>),<strong>servera 掛載來用</strong>。檔案 welcome.txt 一直住在 serverb;servera 這邊只是一個「入口」,讀寫都透過網路打到 serverb。這題你不用設 NFS 伺服器——serverb 已經匯出好了,你只要在 servera 這端把它自動掛起來。</figcaption>
+</figure>
+<div class="note"><strong>前提:serverb 必須開著</strong>——它是檔案的來源,關著的話 servera 這邊掛不起來。查它有沒有匯出:<code>showmount -e serverb</code>。</div>
+</section>
+
+<!-- ============ 2 · autofs ============ -->
+<section>
+<h2><span class="no">2</span>autofs:進去才掛、閒置就卸</h2>
+<p class="sub">你也可以用 <code>mount</code> 或寫 <code>/etc/fstab</code> 把 NFS 目錄「一直掛著」,但這題要的是 <strong>autofs</strong>——只有<strong>真的有人進入</strong>那個目錄時才掛載,一段時間沒人用就自動卸載。</p>
+<figure>
+<svg viewBox="0 0 780 132" role="img" aria-label="autofs 生命週期:平時未掛載,存取時自動掛載,閒置逾時後自動卸載">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.5">
+<rect x="20" y="40" width="180" height="56" rx="9"/>
+<rect x="300" y="40" width="180" height="56" rx="9" stroke="#0E7C5B" stroke-width="2"/>
+<rect x="580" y="40" width="180" height="56" rx="9"/>
+</g>
+<g font-family="Noto Sans TC,sans-serif" text-anchor="middle" fill="currentColor">
+<text x="110" y="64" font-size="13" font-weight="600">平時:未掛載</text>
+<text x="110" y="83" font-size="11" fill="#5B6B62">目錄看起來是空的</text>
+<text x="390" y="64" font-size="13" font-weight="600" fill="#0A5C44">存取瞬間:自動掛載</text>
+<text x="390" y="83" font-size="11" fill="#5B6B62">內容出現、可讀寫</text>
+<text x="670" y="64" font-size="13" font-weight="600">閒置逾時:自動卸載</text>
+<text x="670" y="83" font-size="11" fill="#5B6B62">回到未掛載狀態</text>
+</g>
+<line x1="200" y1="68" x2="296" y2="68" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="480" y1="68" x2="576" y2="68" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+<text x="248" y="58" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10.5" fill="#0E7C5B">ls / cd</text>
+<text x="528" y="58" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="10.5" fill="#5B6B62">沒人用</text>
+</svg>
+<figcaption>autofs 的生命週期是個循環。這解釋了本題驗證時的一個「怪現象」:平時 <code>ls /rhome</code> 看起來是<strong>空的</strong>,直到你 <code>ls /rhome/remoteuser1</code>「踏進去」那一刻才觸發掛載——這不是壞掉,正是 autofs 該有的行為。</figcaption>
+</figure>
+<div class="tablebox"><table>
+<tr><th></th><th>fstab / mount(一直掛著)</th><th>autofs(進去才掛)</th></tr>
+<tr><td>何時掛載</td><td>開機時就掛</td><td>有人存取才掛</td></tr>
+<tr><td>沒人用時</td><td>還是掛著、佔資源</td><td>自動卸載</td></tr>
+<tr><td>伺服器關機時</td><td>開機可能卡住等它</td><td>不受影響(要用才連)</td></tr>
+<tr><td>適合</td><td>永遠都要用的掛載</td><td>偶爾用、或很多個的網路目錄</td></tr>
+</table></div>
+<div class="note"><strong>本題規則:必須用 autofs,不可以寫死 <code>/etc/fstab</code>。</strong>評分會抓——在 fstab 硬掛一行雖然「也能掛上」,但不符合題目要求,不會過。</div>
+</section>
+
+<!-- ============ 3 · indirect map ============ -->
+<section>
+<h2><span class="no">3</span>間接對映:兩個檔案的接力</h2>
+<p class="sub">autofs 怎麼知道「<code>/rhome/remoteuser1</code> 要去掛 serverb 的哪個目錄」?靠<strong>兩個設定檔接力</strong>:master 檔說「哪個母目錄交給哪張對映表管」,對映檔說「這個子目錄對到哪個遠端來源」。</p>
+<figure>
+<svg viewBox="0 0 780 340" role="img" aria-label="間接對映解析鏈:存取 /rhome/remoteuser1,autofs 查 master 檔找到 /rhome 由 auto.rhome 管,再用 key remoteuser1 查到 serverb 的來源並掛載">
+<defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+<!-- access -->
+<rect x="250" y="16" width="280" height="46" rx="9" fill="var(--accent-soft)" stroke="#0E7C5B" stroke-width="1.6"/>
+<text x="390" y="37" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="12.5" font-weight="600" fill="#0A5C44">有人存取 /rhome/remoteuser1</text>
+<text x="390" y="53" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" fill="#5B6B62">ls /rhome/remoteuser1</text>
+<line x1="390" y1="62" x2="390" y2="86" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+<!-- master map -->
+<rect x="120" y="88" width="540" height="66" rx="9" fill="#fff" stroke="currentColor" stroke-width="1.4"/>
+<text x="140" y="110" font-family="Noto Sans TC,sans-serif" font-size="12" font-weight="600" fill="currentColor">① master 檔　/etc/auto.master.d/rhome.autofs</text>
+<text x="140" y="134" font-family="IBM Plex Mono,monospace" font-size="13" fill="#1E2622">/rhome　　/etc/auto.rhome</text>
+<text x="470" y="134" font-family="Noto Sans TC,sans-serif" font-size="11" fill="#5B6B62">母目錄 → 交給這張對映表管</text>
+<line x1="390" y1="154" x2="390" y2="178" stroke="currentColor" stroke-width="1.4" marker-end="url(#ar3)"/>
+<text x="404" y="171" font-family="IBM Plex Mono,monospace" font-size="10.5" fill="#5B6B62">查 key = remoteuser1</text>
+
+<!-- map file -->
+<rect x="120" y="180" width="540" height="80" rx="9" fill="#fff" stroke="currentColor" stroke-width="1.4"/>
+<text x="140" y="202" font-family="Noto Sans TC,sans-serif" font-size="12" font-weight="600" fill="currentColor">② 對映檔　/etc/auto.rhome</text>
+<text x="140" y="228" font-family="IBM Plex Mono,monospace" font-size="12.5" fill="#1E2622">remoteuser1　-rw　serverb.lab.example.com:/rhome/remoteuser1</text>
+<text x="140" y="248" font-family="Noto Sans TC,sans-serif" font-size="11" fill="#5B6B62">key（子目錄名）　選項　　遠端來源</text>
+<line x1="390" y1="260" x2="390" y2="284" stroke="#0E7C5B" stroke-width="1.8" marker-end="url(#ar3)"/>
+
+<!-- result -->
+<rect x="230" y="286" width="320" height="42" rx="9" fill="var(--accent-soft)" stroke="#0E7C5B" stroke-width="1.8"/>
+<text x="390" y="312" text-anchor="middle" font-family="Noto Sans TC,sans-serif" font-size="12.5" font-weight="600" fill="#0A5C44">→ 當場把 serverb 的目錄掛到 /rhome/remoteuser1</text>
+</svg>
+<figcaption>「間接」的意思:master 檔管的是<strong>母目錄</strong> <code>/rhome</code>,底下的子目錄名(<code>remoteuser1</code>)當成 key 去對映檔查。好處是同一張表可以掛很多個子目錄(<code>remoteuser1</code>、<code>remoteuser2</code>…),不必一個個寫死——這也是家目錄自動掛載最常用的方式。</figcaption>
+</figure>
+</section>
+
+<!-- ============ 4 · 實作 ============ -->
+<section>
+<h2><span class="no">4</span>實作:三步設定 + 一步驗證</h2>
+<p class="sub">在 <strong>servera</strong> 上操作(serverb 已匯出好、保持開機)。對照上面的圖:第 1、2 步就是建那兩個接力檔。</p>
+<pre class="term"><span class="c"># 0. 裝套件(minimal 安裝可能沒有)</span>
+<span class="p">#</span> dnf -y install autofs nfs-utils
+
+<span class="c"># 1. master 檔:把母目錄 /rhome 交給 /etc/auto.rhome 管</span>
+<span class="p">#</span> echo '/rhome  /etc/auto.rhome' &gt; /etc/auto.master.d/rhome.autofs
+
+<span class="c"># 2. 對映檔:key remoteuser1 → serverb 的來源</span>
+<span class="p">#</span> echo 'remoteuser1  -rw  serverb.lab.example.com:/rhome/remoteuser1' &gt; /etc/auto.rhome
+
+<span class="c"># 3. 啟用(--now = 現在啟動;enable 保證重開機後仍有效)</span>
+<span class="p">#</span> systemctl enable --now autofs</pre>
+<pre class="term"><span class="c"># 4. 驗證:先「踏進去」觸發掛載,再確認來源</span>
+<span class="p">#</span> ls /rhome/remoteuser1          <span class="c"># 看到 welcome.txt = 掛載被觸發</span>
+<span class="p">#</span> findmnt /rhome/remoteuser1     <span class="c"># 確認來源是 serverb 的 NFS</span>
+<span class="p">#</span> lab grade nfs-autofs</pre>
+<div class="note"><strong>四個評分必中的點:</strong>① autofs 要 <code>enable</code>(不只 start),重開仍有效;② 用 <code>/rhome</code> 的間接對映;③ <strong>不可寫死 fstab</strong>;④ 掛載真的來自 serverb。收尾:<code>lab finish nfs-autofs</code>。</div>
+</section>
+
+<!-- ============ 5 · 排錯 ============ -->
+<section>
+<h2><span class="no">5</span>卡住了?常見原因</h2>
+<div class="tablebox"><table>
+<tr><th>症狀</th><th>檢查/原因</th></tr>
+<tr><td><code>ls /rhome/remoteuser1</code> 沒東西 / 掛不上</td><td>serverb 沒開,或沒匯出:<code>showmount -e serverb</code> 看得到 /rhome 嗎?<code>ping serverb</code> 通嗎?</td></tr>
+<tr><td>改了設定檔沒生效</td><td>沒重載 autofs:<code>systemctl restart autofs</code>(改對映檔後要重啟才讀新內容)</td></tr>
+<tr><td>重開機後失效</td><td>只 <code>start</code> 沒 <code>enable</code>——用 <code>systemctl enable --now autofs</code> 一次到位</td></tr>
+<tr><td>autofs 服務起不來</td><td>對映檔語法錯,或套件沒裝(<code>autofs</code> / <code>nfs-utils</code>)</td></tr>
+</table></div>
+<p class="sub" style="margin-top:14px">記住那個「空目錄」現象:autofs 平時不掛,<code>ls /rhome</code> 是空的很正常;一定要 <code>ls</code> 或 <code>cd</code> <strong>那個子目錄本身</strong>(<code>/rhome/remoteuser1</code>)才會觸發掛載。別看到 /rhome 空的就以為失敗了。</p>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗';
+        if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});
+      }else{
+        var ta=document.createElement('textarea');ta.value=text;
+        ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+        var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+        document.body.removeChild(ta);done(ok);
+      }
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

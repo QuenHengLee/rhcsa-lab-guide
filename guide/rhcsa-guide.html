@@ -50,6 +50,10 @@ article.ex h3 .zh{color:var(--muted);font-weight:500;margin-left:.6em}
   color:var(--accent-ink);background:var(--chip);border-radius:5px;padding:2px 9px}
 .node{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);
   border:1px solid var(--line);border-radius:99px;padding:1px 10px;white-space:nowrap}
+.examtag{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;font-weight:600;color:#fff;background:var(--accent);
+  border-radius:99px;padding:2px 11px;white-space:nowrap;letter-spacing:.02em}
+.examtag::before{content:"★ 必考"}
 .phase{border-top:1px dashed var(--line);padding:12px 0 4px;margin-top:12px}
 .phase h4{margin:0 0 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
   font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:600}
@@ -122,7 +126,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <section class="topic" id="t01"><h2><span class="no">01</span>essential-tools 基本工具</h2>
 
 <article class="ex" id="tools-find">
-<header><span class="name">tools-find</span><h3>Find files by owner and collect them<span class="zh">依擁有者尋找並收集檔案</span></h3><span class="node">servera</span></header>
+<header><span class="name">tools-find</span><h3>Find files by owner and collect them<span class="zh">依擁有者尋找並收集檔案</span></h3><span class="examtag">#find</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start tools-find</pre>
 <p>把系統上所有屬於使用者 simone 的一般檔案複製到 <code>/root/found</code>;別人的檔案不可以混進去。</p></div>
@@ -138,7 +142,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </div></article>
 
 <article class="ex" id="tools-grep-tar">
-<header><span class="name">tools-grep-tar</span><h3>Filter a log with grep, then archive<span class="zh">grep 過濾日誌並打包</span></h3><span class="node">servera</span></header>
+<header><span class="name">tools-grep-tar</span><h3>Filter a log with grep, then archive<span class="zh">grep 過濾日誌並打包</span></h3><span class="examtag">#grep #tar</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start tools-grep-tar</pre>
 <p>把 <code>/opt/lab/system.log</code> 中含 ERROR 的行(保持順序)存到 <code>/root/errors.txt</code>,再打包成 bzip2 壓縮的 <code>/root/errors.tar.bz2</code>。</p></div>
@@ -172,7 +176,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <section class="topic" id="t02"><h2><span class="no">02</span>users-and-groups 使用者與群組</h2>
 
 <article class="ex" id="users-basic">
-<header><span class="name">users-basic</span><h3>Users, groups, shells, UIDs, ageing<span class="zh">帳號、群組、shell、UID 與密碼期限</span></h3><span class="node">servera</span></header>
+<header><span class="name">users-basic</span><h3>Users, groups, shells, UIDs, ageing<span class="zh">帳號、群組、shell、UID 與密碼期限</span></h3><span class="examtag">#使用者群組</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start users-basic</pre>
 <p>建立群組 manager;natasha/harry 以它為附加群組;sarah 用 nologin 且不屬於 manager;jean 的 UID 為 4332;四人密碼都是 <code>Redhat123!</code>;natasha 密碼最長 30 天。</p></div>
@@ -195,7 +199,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </div></article>
 
 <article class="ex" id="users-sudo">
-<header><span class="name">users-sudo</span><h3>Grant a group passwordless sudo<span class="zh">給群組免密碼 sudo</span></h3><span class="node">servera</span></header>
+<header><span class="name">users-sudo</span><h3>Grant a group passwordless sudo<span class="zh">給群組免密碼 sudo</span></h3><span class="examtag">#sudo</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start users-sudo</pre>
 <p>建立 opsuser(附加群組 operators,密碼 <code>Redhat123!</code>),並讓 operators 全體成員免密碼執行任何指令。規則必須授予「群組」而非個人。</p></div>
@@ -267,7 +271,7 @@ drwxrws--T. ... root accounting ...
 <p class="note">實測手感:<code>su - amy</code> 進去 <code>touch /home/accounting/a.txt</code>,再 <code>ls -l</code> 看群組是否自動變 accounting;換 <code>su - ben</code> 試著 <code>rm a.txt</code>,會被 sticky 擋下——這兩個動作做一次,setgid/sticky 就再也不會忘。</p></article>
 
 <article class="ex" id="perms-umask">
-<header><span class="name">perms-umask</span><h3>Default permissions with umask<span class="zh">用 umask 設預設權限</span></h3><span class="node">servera</span></header>
+<header><span class="name">perms-umask</span><h3>Default permissions with umask<span class="zh">用 umask 設預設權限</span></h3><span class="examtag">#umask</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start perms-umask</pre>
 <p>讓 webdev 的新登入 shell 中,新檔 640、新目錄 750,而且登出再登入仍有效;其他使用者不受影響。題目通常只給你「640 / 750」這兩個目標權限,umask 的值要自己推。</p></div>
@@ -317,7 +321,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="storage-lvm">
-<header><span class="name">storage-lvm</span><h3>Volume group with custom extent size<span class="zh">自訂 extent 大小的 VG</span></h3><span class="node">servera</span></header>
+<header><span class="name">storage-lvm</span><h3>Volume group with custom extent size<span class="zh">自訂 extent 大小的 VG</span></h3><span class="examtag">#LVM</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start storage-lvm</pre>
 <p>nvme0n1 上建 PV;VG 叫 wgroup、PE 大小 8 MiB;LV 叫 wshare、大小「100 個 extents」;格式化 VFAT、持久掛載 <code>/mnt/wshare</code>。</p></div>
@@ -339,7 +343,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="storage-lvm-extend">
-<header><span class="name">storage-lvm-extend</span><h3>Extend an LV and its filesystem<span class="zh">線上擴充 LV 與檔案系統</span></h3><span class="node">servera</span></header>
+<header><span class="name">storage-lvm-extend</span><h3>Extend an LV and its filesystem<span class="zh">線上擴充 LV 與檔案系統</span></h3><span class="examtag">#LVM擴充</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start storage-lvm-extend</pre>
 <p>把掛在 <code>/mnt/vo</code> 的 testvg/vo(512 MiB)連同 XFS 一起擴充到至少 1 GiB,裡面的 company-data.txt 一個位元組都不能少。</p></div>
@@ -353,7 +357,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="storage-swap">
-<header><span class="name">storage-swap</span><h3>Add a swap partition<span class="zh">新增 swap 分割區</span></h3><span class="node">servera</span></header>
+<header><span class="name">storage-swap</span><h3>Add a swap partition<span class="zh">新增 swap 分割區</span></h3><span class="examtag">#swap</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start storage-swap</pre>
 <p>在 nvme0n2 建 512 MiB swap 分割區,立即啟用並設定開機自動啟用;原本的 swap 不可動。</p></div>
@@ -413,7 +417,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="nfs-autofs">
-<header><span class="name">nfs-autofs</span><h3>Automount an NFS export with autofs<span class="zh">autofs 自動掛載 NFS</span></h3><span class="node">servera ← serverb</span></header>
+<header><span class="name">nfs-autofs</span><h3>Automount an NFS export with autofs<span class="zh">autofs 自動掛載 NFS</span></h3><span class="examtag">#autofs</span><span class="node">servera ← serverb</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start nfs-autofs</pre>
 <p>serverb 匯出 <code>/rhome</code>;在 servera 用 autofs「間接對映」讓 <code>/rhome/remoteuser1</code> 進入時自動掛載,不可寫 fstab。<strong>serverb 必須開機。</strong></p></div>
@@ -451,7 +455,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="sched-cron">
-<header><span class="name">sched-cron</span><h3>Recurring job for another user<span class="zh">替他人設 cron 排程</span></h3><span class="node">servera</span></header>
+<header><span class="name">sched-cron</span><h3>Recurring job for another user<span class="zh">替他人設 cron 排程</span></h3><span class="examtag">#cron</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sched-cron</pre>
 <p>讓 <code>/usr/bin/logger "EX200 in progress"</code> 以 natasha 身分每天 14:23 執行,必須放在 natasha 自己的 crontab。</p></div>
@@ -468,7 +472,7 @@ drwxrws--T. ... root accounting ...
 </div></article>
 
 <article class="ex" id="sched-timer">
-<header><span class="name">sched-timer</span><h3>Recurring job with a systemd timer<span class="zh">systemd timer 週期排程</span></h3><span class="node">servera</span></header>
+<header><span class="name">sched-timer</span><h3>Recurring job with a systemd timer<span class="zh">systemd timer 週期排程</span></h3><span class="examtag">#timer</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sched-timer</pre>
 <p>建立 oneshot service 執行 <code>/usr/local/bin/labreport.sh</code>,再建 timer 每 10 分鐘觸發;enable 的對象是 timer,service 本身不可 enable。</p></div>
@@ -517,7 +521,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="services-tuned">
-<header><span class="name">services-tuned</span><h3>Select a tuning profile<span class="zh">選擇 tuned 調校 profile</span></h3><span class="node">servera</span></header>
+<header><span class="name">services-tuned</span><h3>Select a tuning profile<span class="zh">選擇 tuned 調校 profile</span></h3><span class="examtag">#tuned</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start services-tuned</pre>
 <p>安裝並啟用 tuned,把使用中 profile 設為 virtual-guest。</p></div>
@@ -536,7 +540,7 @@ UNIT
 <section class="topic" id="t07"><h2><span class="no">07</span>network-and-time 網路與時間</h2>
 
 <article class="ex" id="net-nmcli">
-<header><span class="name">net-nmcli</span><h3>Static IPv4 with nmcli<span class="zh">nmcli 設定靜態 IP</span></h3><span class="node">servera</span></header>
+<header><span class="name">net-nmcli</span><h3>Static IPv4 with nmcli<span class="zh">nmcli 設定靜態 IP</span></h3><span class="examtag">#網路設定</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start net-nmcli</pre>
 <p>在第三張網卡 enp0s9 建立 labnet 連線:靜態 172.25.250.10/24、DNS 172.25.250.254、不可搶預設路由、開機自動啟用;另讓 labserver 不經 DNS 解析為 172.25.250.11。<strong>enp0s3/enp0s8 不可動。</strong></p></div>
@@ -555,7 +559,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="time-chrony">
-<header><span class="name">time-chrony</span><h3>Point chronyd at a time source<span class="zh">chrony 指定時間來源</span></h3><span class="node">servera</span></header>
+<header><span class="name">time-chrony</span><h3>Point chronyd at a time source<span class="zh">chrony 指定時間來源</span></h3><span class="examtag">#時間同步</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start time-chrony</pre>
 <p>讓 chronyd 以 classroom.lab.example.com(加 iburst)為唯一時間來源;其他 server/pool 行全部移除或註解。</p></div>
@@ -611,7 +615,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="sec-selinux-fix">
-<header><span class="name">sec-selinux-fix</span><h3>Diagnose and repair an SELinux denial<span class="zh">診斷並修復 SELinux 拒絕</span></h3><span class="node">servera</span></header>
+<header><span class="name">sec-selinux-fix</span><h3>Diagnose and repair an SELinux denial<span class="zh">診斷並修復 SELinux 拒絕</span></h3><span class="examtag">#SELinux修復</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sec-selinux-fix</pre>
 <p>httpd 改用 <code>/lab-content</code> 當內容目錄,一切看似正確但 curl 失敗。找出原因、永久修復,SELinux 保持 enforcing。</p></div>
@@ -645,7 +649,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="sec-selinux-httpd">
-<header><span class="name">sec-selinux-httpd</span><h3>httpd on a non-standard port, enforcing<span class="zh">非標準埠 + enforcing 的 httpd</span></h3><span class="node">servera</span></header>
+<header><span class="name">sec-selinux-httpd</span><h3>httpd on a non-standard port, enforcing<span class="zh">非標準埠 + enforcing 的 httpd</span></h3><span class="examtag">#SELinux埠</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sec-selinux-httpd</pre>
 <p>httpd 以 <code>/web</code> 為 DocumentRoot、監聽 82 埠、頁面內容恰為「Welcome to servera」;SELinux enforcing、防火牆放行 82。這是把檔案標籤、埠標籤、防火牆全部串起來的大題。</p></div>
@@ -801,7 +805,7 @@ CONF
 <section class="topic" id="t12"><h2><span class="no">12</span>software + boot 套件管理與開機救援</h2>
 
 <article class="ex" id="dnf-repo">
-<header><span class="name">dnf-repo</span><h3>Enable a DNF repository<span class="zh">設定 DNF 套件庫</span></h3><span class="node">servera</span></header>
+<header><span class="name">dnf-repo</span><h3>Enable a DNF repository<span class="zh">設定 DNF 套件庫</span></h3><span class="examtag">#套件庫</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start dnf-repo</pre>
 <p>為 <code>/opt/labrepo</code> 建 repo 檔(id 恰為 labrepo、gpgcheck 開啟、指定 Rocky 10 金鑰),再從裡面裝 zsh。</p></div>
@@ -844,7 +848,7 @@ REPO
 </div></article>
 
 <article class="ex" id="boot-rootpw">
-<header><span class="name">boot-rootpw</span><h3>Reset a lost root password<span class="zh">重設遺失的 root 密碼</span></h3><span class="node">serverb(需 console)</span></header>
+<header><span class="name">boot-rootpw</span><h3>Reset a lost root password<span class="zh">重設遺失的 root 密碼</span></h3><span class="examtag">#root密碼</span><span class="node">serverb(需 console)</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start boot-rootpw</pre>
 <p class="note">本題把 root 密碼打亂成「你不知道」的值,要用 <strong>GRUB 開機中斷(rd.break)</strong>把它重設為 <code>redhat123</code>。這是 RHCSA 考綱明列、最經典的必考大題(對應「Interrupt the boot process to gain access」)。必須用 serverb 的 console:<br><code>VBoxManage controlvm serverb poweroff</code> → <code>VBoxManage startvm serverb --type separate</code></p></div>

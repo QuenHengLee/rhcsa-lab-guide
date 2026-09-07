@@ -1,0 +1,243 @@
+<title>重設 root 密碼逐步詳解</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F6F7F5; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --line:#DCE3DE; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --err-bg:#FBEDEA; --err-ink:#9A3B27; --err-line:#EDC9BF;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A; --term-hl:#E4C57C; --term-err:#F0907A;
+  --key-bg:#FFFFFF; --key-line:#C4CFC8; --key-ink:#243029;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:820px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:33px;font-weight:700;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 8px;max-width:64ch;font-size:16.5px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.9em;background:var(--chip);padding:1px 6px;border-radius:4px}
+h2{font-size:20px;font-weight:700;margin:0 0 4px}
+.intro{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:24px 0}
+.intro h2{margin-top:0}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;
+  padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative;
+  font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+pre.term .hl{color:var(--term-hl)}
+pre.term .er{color:var(--term-err)}
+kbd{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.85em;font-weight:600;
+  background:var(--key-bg);color:var(--key-ink);border:1px solid var(--key-line);
+  border-bottom-width:2px;border-radius:5px;padding:1px 7px;min-width:1.4em;text-align:center}
+/* steps */
+.step{display:grid;grid-template-columns:52px 1fr;gap:0 18px;margin:22px 0;align-items:start}
+.step .num{grid-row:1/99;position:relative}
+.step .num b{display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;border-radius:12px;background:var(--accent);color:#fff;
+  font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:19px}
+.step .num::after{content:"";position:absolute;left:22px;top:50px;bottom:-30px;width:2px;background:var(--line)}
+.step:last-of-type .num::after{display:none}
+.step .body{min-width:0;padding-bottom:6px}
+.step h3{font-family:"IBM Plex Sans","Noto Sans TC",sans-serif;font-size:18px;margin:6px 0 6px;line-height:1.35}
+.step .what{color:var(--muted);font-size:14.5px;margin:0 0 4px}
+.step p{margin:8px 0}
+.why{border-left:3px solid var(--accent);background:var(--accent-soft);
+  border-radius:0 8px 8px 0;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.why b{color:var(--accent-ink)}
+.pitfall{background:var(--err-bg);color:var(--err-ink);border:1px solid var(--err-line);
+  border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.pitfall b{font-weight:700}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.note code,.pitfall code,.why code{background:rgba(0,0,0,.06);color:inherit}
+.tablebox{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;font-size:14px;width:100%}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+section.blk{margin-top:44px;border-top:2px solid var(--accent);padding-top:14px}
+.recap{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+.recap div{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 13px;font-size:13.5px}
+.recap .m{font-family:"IBM Plex Mono",monospace;color:var(--accent-ink);font-size:12.5px;font-weight:600;display:block;margin-bottom:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;
+  font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;
+  color:var(--term-ink);background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.2);border-radius:5px;
+  padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s,color .15s,border-color .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · boot-and-recovery · init=/bin/bash 法</p>
+<h1>重設 root 密碼逐步詳解</h1>
+<p class="lede">「忘記 root 密碼」是 RHCSA 考綱明列的必考題(Interrupt the boot process to gain access)。你沒有任何登入管道,唯一的路是從開機載入器(GRUB)介入。這頁把每一步拆開講:要打什麼、會看到什麼、<strong>為什麼</strong>非這樣不可,以及每一步最容易卡住的錯誤。</p>
+
+<div class="intro">
+<h2>原理:為什麼 <code>init=/bin/bash</code> 能免密碼進去</h2>
+<p style="margin:8px 0">核心開機的最後一步,是把 PID 1(第一個程序)交給 <code>systemd</code>,再由它拉起登入畫面、要你輸入帳號密碼。我們在 GRUB 把核心參數改成 <code>init=/bin/bash</code>,等於告訴核心:<strong>「別叫 systemd,直接把 PID 1 換成一個 bash shell」</strong>。</p>
+<p style="margin:8px 0 0">於是系統一開機就落在一個 root 身分的 bash shell,<strong>完全跳過登入與密碼那一關</strong>——你就能直接進去把 root 密碼改掉。根(root 檔案系統)這時直接掛在 <code>/</code>,不需要額外切換目錄,操作很直覺。</p>
+</div>
+
+<div class="intro">
+<h2>先搞懂:什麼是「GRUB 選單」</h2>
+<p style="margin:8px 0"><strong>GRUB</strong>(GRand Unified Bootloader)是 Linux 的<strong>開機載入器</strong>——負責在韌體交棒後,把 Linux 核心載入記憶體並執行。開機順序是:</p>
+<pre class="term"><span class="c">按電源 → 韌體(BIOS/UEFI) → </span><span class="hl">GRUB(選單在這)</span><span class="c"> → 載入核心 → systemd → 登入畫面</span></pre>
+<p style="margin:8px 0">在真正載入核心「之前」,GRUB 會顯示一個<strong>選單</strong>讓你選要開哪個核心——每一行就是一個開機項目(通常是不同版本的核心,更新後會保留舊版供回退):</p>
+<pre class="term"><span class="hl">*Rocky Linux (6.12.0-211...) 10</span>   <span class="c"># 預設項(反白),倒數幾秒自動開</span>
+ Rocky Linux (6.12.0-舊版) 10     <span class="c"># 舊核心,可回退</span>
+ Rescue image                     <span class="c"># 救援模式</span></pre>
+<p style="margin:8px 0 0">這正是重設密碼「唯一的入口」——因為它出現在<strong>「還沒進系統、還不需要密碼」</strong>的時機。所以整套流程都從這個選單開始。</p>
+<div class="note" style="margin-top:14px"><b>兩個常見狀況:</b>①選單常被設成 0 秒逾時、直接開機看不到——開機早期<strong>一直按 <kbd>Esc</kbd>(或 <kbd>Shift</kbd>)</strong>就能叫出來。②<strong>反白 ≠ 開機</strong>:方向鍵只是移動選擇;按 <kbd>Enter</kbd> 是正常開這項、按 <kbd>e</kbd> 才是編輯這項。重設密碼要按的是 <kbd>e</kbd>。</div>
+</div>
+
+<!-- STEP 1 -->
+<div class="step">
+<div class="num"><b>1</b></div>
+<div class="body">
+<h3>重開機,在 GRUB 選單按 <kbd>e</kbd> 編輯</h3>
+<p class="what">開機時 GRUB 選單出現的幾秒內動作。</p>
+<p>用方向鍵把預設的核心項目<strong>反白</strong>,按 <kbd>e</kbd> 進入編輯畫面(不是按 Enter——那會直接正常開機)。你會看到這個開機項的完整設定,包含一條很長的 <code>linux</code> 行和一條 <code>initrd</code> 行。</p>
+<div class="why"><b>為什麼:</b>GRUB 是唯一在「還沒進作業系統、還沒需要密碼」時就能介入的地方。按 <kbd>e</kbd> 讓你臨時改這一次開機的參數(改動不寫回磁碟,重開就恢復)。</div>
+</div>
+</div>
+
+<!-- STEP 2 -->
+<div class="step">
+<div class="num"><b>2</b></div>
+<div class="body">
+<h3>編輯 <code>linux</code> 行:加 <code>init=/bin/bash</code>、刪 <code>console=</code></h3>
+<p class="what">找到以 <code>linux</code> 開頭、含 <code>vmlinuz</code> 與 <code>root=/dev/mapper/rl-root</code> 的那一行。</p>
+<pre class="term"><span class="c"># 這條 linux 行很長,畫面上會「折成兩行」顯示,但它是同一條邏輯行:</span>
+linux ($root)/vmlinuz-6.12... root=/dev/mapper/rl-root ro crashkernel=...
+  resume=UUID=... rd.lvm.lv=rl/root rd.lvm.lv=rl/swap <span class="hl">init=/bin/bash</span>
+<span class="c">                                          ↑ 加在這條行的最尾端,前面留一個空格</span>
+initrd ($root)/initramfs-....img          <span class="c"># ← 這是「另一條」行,不要動它</span></pre>
+<p>兩件事一起做:<strong>(a)</strong> 移到 <code>linux</code> 行最尾端(<kbd>Ctrl</kbd>+<kbd>e</kbd> 跳行尾),空一格後打 <code>init=/bin/bash</code>;<strong>(b)</strong> 若行內有 <code>console=tty0 console=ttyS0</code>,把它們刪掉(見下方陷阱)。</p>
+<div class="why"><b>為什麼加 init=/bin/bash:</b>把 PID 1 從 systemd 換成 bash,一開機就是 root shell、跳過登入。</div>
+<div class="pitfall"><b>踩雷一:<code>invalid file name 'init=/bin/bash'</code></b><br>你把它加到了 <code>initrd</code> 行、或自己按 Enter 另起一行。GRUB 就把 <code>init=/bin/bash</code> 當成「要載入的檔案」→ 找不到而報錯。<b>修正:</b>它只能接在 <code>linux</code> 行尾(<code>rd.lvm.lv=rl/swap</code> 後面),同一行、不換行。</div>
+<div class="pitfall"><b>踩雷二:進了 shell 卻打不了字(像當機)</b><br>沒刪 <code>console=ttyS0</code>。多個 <code>console=</code> 時,<b>最後一個</b>會成為 /dev/console;ttyS0 是序列埠,你的鍵盤打在圖形畫面(tty0)上,shell 卻在序列埠、收不到。<b>修正:</b>把 <code>console=tty0 console=ttyS0</code> 從這行刪掉(考試機常預設有,務必刪)。</div>
+</div>
+</div>
+
+<!-- STEP 3 -->
+<div class="step">
+<div class="num"><b>3</b></div>
+<div class="body">
+<h3>按 <kbd>Ctrl</kbd>+<kbd>x</kbd> 用修改後的參數開機</h3>
+<p class="what">編輯完成後送出。</p>
+<pre class="term"><span class="c"># 開機後直接落在 root shell,提示字元像這樣:</span>
+bash-5.2#</pre>
+<p>看到 <code>bash-5.2#</code> 就對了——你現在是 root(PID 1 是 bash),但此刻的根檔案系統是<strong>唯讀</strong>的。</p>
+<div class="why"><b>為什麼是唯讀:</b>核心開機初期只以唯讀掛載根,確保檔案系統一致、可被安全檢查。下一步要改密碼(寫檔),必須先改成可寫。</div>
+</div>
+</div>
+
+<!-- STEP 4 -->
+<div class="step">
+<div class="num"><b>4</b></div>
+<div class="body">
+<h3>把根重新掛成可讀寫</h3>
+<pre class="term"><span class="p">bash-5.2#</span> mount -o rw,remount /
+<span class="p">bash-5.2#</span> mount | grep ' / '        <span class="c"># 確認開頭是 rw 不是 ro</span></pre>
+<p><code>rw</code> 和 <code>remount</code> 順序不拘,<code>mount -o remount,rw /</code> 也一樣。最後的 <code>/</code> 是掛載點,不能漏。</p>
+<div class="why"><b>為什麼:</b>下一步 <code>passwd</code> 要把新密碼雜湊寫進 <code>/etc/shadow</code>。根還是唯讀就寫不進去。</div>
+<div class="pitfall"><b>踩雷三:passwd 時報 <code>authentication token manipulation error</code></b><br>這正是「根還是唯讀」的訊號——你跳過了這步、或 remount 沒成功。<b>修正:</b>先把這步做成功(<code>mount | grep ' / '</code> 顯示 <code>rw</code>),再回去 passwd。</div>
+</div>
+</div>
+
+<!-- STEP 5 -->
+<div class="step">
+<div class="num"><b>5</b></div>
+<div class="body">
+<h3>設定新的 root 密碼</h3>
+<pre class="term"><span class="p">bash-5.2#</span> passwd root
+New password: <span class="hl">redhat123</span>
+Retype new password: <span class="hl">redhat123</span>
+passwd: all authentication tokens updated successfully.</pre>
+<p>輸入兩次新密碼(打字時螢幕不會顯示,正常)。看到 <code>updated successfully</code> 才算成功。</p>
+<div class="note">密碼太簡單時 passwd 可能會 <code>BAD PASSWORD</code> 警告,但<strong>身為 root 它仍會接受</strong>——警告完照樣要你再輸入一次確認即可,不影響結果。</div>
+</div>
+</div>
+
+<!-- STEP 6 -->
+<div class="step">
+<div class="num"><b>6</b></div>
+<div class="body">
+<h3>建立 <code>/.autorelabel</code> 觸發 SELinux 重新標記</h3>
+<pre class="term"><span class="p">bash-5.2#</span> touch /.autorelabel</pre>
+<p>在根目錄建一個空檔 <code>.autorelabel</code>。下次開機時 SELinux 會偵測到它,對整個檔案系統重新標記一遍,然後自動再重開一次。</p>
+<div class="why"><b>為什麼這步最關鍵、最常被忘:</b>你在 <code>init=/bin/bash</code> 這種殘缺環境改了 <code>/etc/shadow</code>,SELinux 的標記機制沒正常運作,<code>/etc/shadow</code> 可能被貼上錯的 context。SELinux enforcing 下,登入程式讀不了標記錯誤的 shadow → <strong>你會發現新密碼「明明對卻登不進去」</strong>。<code>touch /.autorelabel</code> 讓系統重標一次,把 context 修正回來。</div>
+<div class="pitfall"><b>漏掉的後果:</b>重開後用 redhat123 登入一直失敗、像密碼沒改成功。若真的漏了,再進一次 <code>init=/bin/bash</code> 補 <code>touch /.autorelabel</code> 即可救回。</div>
+</div>
+</div>
+
+<!-- STEP 7 -->
+<div class="step">
+<div class="num"><b>7</b></div>
+<div class="body">
+<h3>交還 systemd,讓系統開完機</h3>
+<pre class="term"><span class="p">bash-5.2#</span> exec /sbin/init</pre>
+<p>用 <code>exec</code> 把目前的 bash(PID 1)換成 <code>/sbin/init</code>(就是 systemd),系統於是繼續正常開機流程:偵測到 <code>.autorelabel</code> → 重新標記 → 自己重開一次 → 出現正常登入畫面。</p>
+<div class="why"><b>為什麼用 exec:</b>此刻 PID 1 是 bash,沒有 systemd 在跑,一般的 <code>reboot</code>/<code>systemctl</code> 不管用。<code>exec /sbin/init</code> 是最乾淨的「接手」方式。</div>
+<div class="note"><b>備援:</b>若 <code>exec /sbin/init</code> 卡住,改用強制重開:<code>mount -o ro,remount /</code> 然後 <code>exec /sbin/reboot -f</code>(先把根改回唯讀再強制重開,避免檔案系統受損)。</div>
+</div>
+</div>
+
+<!-- VERIFY -->
+<section class="blk">
+<h2>最後:確認成功</h2>
+<p class="lede">relabel 完、正常開機後,在登入畫面用 <code>root</code> / <code>redhat123</code> 登入。進得去就成功了。</p>
+<pre class="term"><span class="c"># 練習環境(lab)裡用評分確認:</span>
+<span class="p">$</span> lab grade boot-rootpw
+  PASS  root's password is now redhat123
+  PASS  the system was rebooted after the reset
+  ...</pre>
+</section>
+
+<!-- MENTAL MODEL -->
+<section class="blk">
+<h2>整套流程的心智模型</h2>
+<p class="lede">七步其實在回答四個問題,記住這條因果鏈就不會漏步:</p>
+<div class="recap">
+<div><span class="m">怎麼免密碼進去</span>GRUB 改 init=/bin/bash</div>
+<div><span class="m">怎麼看得到 shell</span>刪掉 console=</div>
+<div><span class="m">怎麼能寫檔</span>remount rw</div>
+<div><span class="m">怎麼改密碼</span>passwd root</div>
+<div><span class="m">怎麼不被 SELinux 鎖</span>touch /.autorelabel</div>
+<div><span class="m">怎麼開完機</span>exec /sbin/init</div>
+</div>
+<div class="note" style="margin-top:16px"><b>三個最痛的雷,對應三個成功訊號:</b>加對行 → Ctrl-x 不報 <code>invalid file name</code>;刪掉 console= → 進 shell 打字有反應;remount rw → passwd 顯示 <code>updated successfully</code>。每一步都等到成功訊號再往下,就不會白忙一趟。</div>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.c,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗';
+        if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});
+      }else{
+        var ta=document.createElement('textarea');ta.value=text;
+        ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+        var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+        document.body.removeChild(ta);done(ok);
+      }
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

@@ -13,8 +13,11 @@ A self-contained practice environment and bilingual (English + 繁體中文) stu
 
 | 目錄 | 內容 |
 |------|------|
-| `guide/rhcsa-guide.html` | **題解手冊**:34 題的標準解法,每題四步驟(啟動 → 逐步解法 → 評分驗證 → 收尾),含考場心法與 man 查法 |
+| `guide/rhcsa-guide.html` | **題解手冊**:34 題的標準解法,每題四步驟(啟動 → 逐步解法 → 評分驗證 → 收尾),含考場心法與 man 查法。標 ★必考 #TAG 者為高機率考點 |
 | `guide/disk-partition.html` | **磁碟分割圖解**:五層流程、MBR/GPT、fstab、LVM 積木池、swap 的概念圖 |
+| `guide/nfs-autofs.html` | **NFS 與 autofs 圖解**:匯出/掛載、autofs 生命週期、間接對映兩檔接力 |
+| `guide/rootpw-reset.html` | **重設 root 密碼詳解**:init=/bin/bash 法七步逐一拆解 + 常見錯誤 |
+| `guide/man-guide.html` | **man 手冊速成**:less 快捷鍵、章節編號、照抄 EXAMPLES 的考場動線 |
 | `labs/*.lab` | 34 個練習題定義(題目、環境佈置、自動評分、清理),中英雙語題目敘述 |
 | `setup/` | 部署腳本、`lab` 主程式、共用函式庫、彩色提示字元設定 |
 
