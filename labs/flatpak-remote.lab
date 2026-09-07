@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Source: RH124 ch.13 "Install and Update Software" - Flatpak
-LAB_TITLE="Add a Flatpak remote for one user only"
+LAB_TITLE="Add a Flatpak remote and install a runtime for one user"
 LAB_TOPIC="12 software + boot"
 LAB_NODE="servera"
 
@@ -19,11 +19,21 @@ lab_describe() {
     2. It is a USER-level remote - it must belong to flatpakuser only, not
        to the whole system. Use the --user option.
 
-  Do the work as flatpakuser (for example: su - flatpakuser). A remote
-  added with --user lives under the user's own home, so root's
-  "flatpak remotes --system" must NOT list it.
+    3. Still as flatpakuser, install the Freedesktop Platform runtime from
+       that remote:
+
+           flatpak install --user flathub org.freedesktop.Platform
+
+       Several versions exist, so it will ask which one - type the number
+       to pick one (or add a branch, e.g. .../Platform//24.08). This
+       downloads a few hundred MB, so it needs internet and a little time.
+
+  Do the work as flatpakuser (for example: su - flatpakuser). Anything
+  added or installed with --user lives under the user's own home, so
+  root's "flatpak remotes --system" must NOT list the remote.
 
   Verify as flatpakuser with:  flatpak remotes --user
+                               flatpak list --user
 
   ----- 中文說明 -----
 
@@ -36,11 +46,20 @@ lab_describe() {
     2. 它是「使用者層級(--user)」的 remote——只屬於 flatpakuser,
        不是整台系統共用。要用 --user 選項。
 
-  請以 flatpakuser 身分操作(例如:su - flatpakuser)。用 --user 加的
-  remote 放在該使用者自己的家目錄下,所以 root 的
-  「flatpak remotes --system」不該列得出它。
+    3. 一樣以 flatpakuser 身分,從這個 remote 安裝 Freedesktop Platform
+       runtime:
+
+           flatpak install --user flathub org.freedesktop.Platform
+
+       有多個版本,它會問你選哪個——輸入清單裡的號碼選一個(或指定
+       分支,例如 .../Platform//24.08)。會下載數百 MB,需要網路和時間。
+
+  請以 flatpakuser 身分操作(例如:su - flatpakuser)。用 --user 加/裝
+  的東西都放在該使用者自己的家目錄下,所以 root 的
+  「flatpak remotes --system」不該列得出這個 remote。
 
   以 flatpakuser 身分驗證:flatpak remotes --user
+                           flatpak list --user
 EOF
 }
 
@@ -71,6 +90,13 @@ _not_system_wide() {
     ! flatpak remotes --system 2>/dev/null | awk '{print $1}' | grep -qx "$LAB_REMOTE"
 }
 
+_runtime_installed() {
+    # An installed runtime leaves a deployed tree with an "active" ref under
+    # the user's flatpak dir. Present = org.freedesktop.Platform is installed.
+    [ -n "$(find /home/$LAB_USER/.local/share/flatpak/runtime/org.freedesktop.Platform \
+             -maxdepth 3 -name active 2>/dev/null | head -1)" ]
+}
+
 lab_setup() {
     lab_ensure_pkg flatpak
     # Fresh user so no stale flatpak config lingers.
@@ -89,6 +115,7 @@ lab_grade() {
     grade_test "a user-level remote 'flathub' was added"      _remote_user_scoped
     grade_test "the remote points at the Flathub repository"  _remote_points_flathub
     grade_test "it was NOT added system-wide"                 _not_system_wide
+    grade_test "the org.freedesktop.Platform runtime is installed for the user" _runtime_installed
 }
 
 lab_finish() {

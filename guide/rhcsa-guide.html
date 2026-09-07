@@ -865,8 +865,10 @@ REPO
 <pre class="term"><span class="p">#</span> dnf -y install flatpak          <span class="c"># 沒裝的話先裝</span>
 <span class="p">#</span> su - flatpakuser                 <span class="c"># ★ 切成該使用者操作</span>
 <span class="p">$</span> flatpak remote-add --user flathub \
-      https://flathub.org/repo/flathub.flatpakrepo</pre>
-<p>兩個丟分點:① 忘了 <code>--user</code> 就變成系統層級,不符合「只給該使用者」;② 忘了先 <code>su - flatpakuser</code>,用 root 加就加錯人了。加來源不需要真的裝 app。</p></div>
+      https://flathub.org/repo/flathub.flatpakrepo
+<span class="p">$</span> flatpak install --user flathub org.freedesktop.Platform
+  <span class="c"># 會問選哪個版本 → 輸入號碼挑一個(或指定 //24.08),下載數百 MB</span></pre>
+<p>三個丟分點:① 忘了 <code>--user</code> 就變成系統層級,不符合「只給該使用者」;② 忘了先 <code>su - flatpakuser</code>,用 root 加就加錯人;③ 安裝 <code>org.freedesktop.Platform</code> runtime 有多版本,會停下來問你選哪個——輸入清單號碼即可。</p></div>
 <div class="duo">
 <div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> flatpak remotes --user    <span class="c"># 應列出 flathub</span>
 <span class="p">$</span> exit
