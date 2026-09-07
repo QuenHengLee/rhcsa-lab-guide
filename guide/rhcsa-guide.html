@@ -54,6 +54,11 @@ article.ex h3 .zh{color:var(--muted);font-weight:500;margin-left:.6em}
   font-size:11.5px;font-weight:600;color:#fff;background:var(--accent);
   border-radius:99px;padding:2px 11px;white-space:nowrap;letter-spacing:.02em}
 .examtag::before{content:"★ 必考"}
+#notest{margin-top:56px;border:1px dashed var(--line);border-radius:10px;padding:18px 22px}
+#notest h2{margin:0 0 10px;font-size:15px;color:var(--muted)}
+#notest h2::before{content:"✕ ";color:var(--muted)}
+#notest ul{margin:0;padding-left:20px;color:var(--muted);font-size:13.5px;line-height:1.9}
+#notest li strong{color:var(--ink)}
 .phase{border-top:1px dashed var(--line);padding:12px 0 4px;margin-top:12px}
 .phase h4{margin:0 0 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
   font-family:"IBM Plex Mono",monospace;color:var(--accent);font-weight:600}
@@ -958,6 +963,14 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish boot-rootpw</pre></div>
 </div>
 <p class="note">和 boot-rescue 的差別:emergency mode <strong>要先知道 root 密碼</strong>才進得去;<code>init=/bin/bash</code> 是在 GRUB 直接把 PID 1 換成 bash、跳過登入,<strong>不需密碼</strong>,正是給「連 root 密碼都不知道」用的。兩題操作不同,別搞混。<br><strong>另一種等效教法</strong>是 <code>rd.break</code>(進 initramfs,根在 <code>/sysroot</code>、需 <code>chroot</code>),殊途同歸;克能老師教的 <code>init=/bin/bash</code> 好處是根直接在 <code>/</code>、少一步 chroot。</p></article>
+</section>
+
+<section id="notest">
+<h2>確認不考清單(老師/考情確認,讀到這些可以跳過)</h2>
+<ul>
+<li><strong>vgreduce</strong> — 從 Volume Group 移除實體磁碟(PV)。LVM 只考建立與擴充(pvcreate / vgcreate / vgextend / lvcreate / lvextend),縮減方向不考。</li>
+<li><strong>autofs direct map(直接對映)</strong> — 老師說只考自動掛載的間接對映(indirect map),見 nfs-autofs 題。</li>
+</ul>
 </section>
 
 <footer>
