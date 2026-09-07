@@ -199,7 +199,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </div></article>
 
 <article class="ex" id="users-sudo">
-<header><span class="name">users-sudo</span><h3>Grant a group passwordless sudo<span class="zh">給群組免密碼 sudo</span></h3><span class="examtag">#sudo</span><span class="node">servera</span></header>
+<header><span class="name">users-sudo</span><h3>Grant a group passwordless sudo<span class="zh">給群組免密碼 sudo</span></h3><span class="examtag">#免密sudo NOPASSWD</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start users-sudo</pre>
 <p>建立 opsuser(附加群組 operators,密碼 <code>Redhat123!</code>),並讓 operators 全體成員免密碼執行任何指令。規則必須授予「群組」而非個人。</p></div>
