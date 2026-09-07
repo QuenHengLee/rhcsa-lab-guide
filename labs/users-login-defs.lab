@@ -1,0 +1,77 @@
+# shellcheck shell=bash
+# Source: RHCSA "Manage password aging defaults" - /etc/login.defs
+LAB_TITLE="Set the default password aging for future users"
+LAB_TOPIC="02 users-and-groups"
+LAB_NODE="servera"
+
+LAB_TESTUSER=logindefs_probe
+LAB_TARGET_MAX=60
+
+lab_describe() {
+    cat <<'EOF'
+  Configure /etc/login.defs so that EVERY user created FROM NOW ON has a
+  password that expires after at most 60 days.
+
+    - Change the default in /etc/login.defs - this is the file useradd
+      reads for new-account defaults. Do NOT just run chage on an
+      existing user; that only affects that one account.
+
+    - Existing accounts are not required to change. This exercise is
+      about the default applied to accounts created AFTER your edit.
+
+  Verify by creating a throwaway user and running "chage -l <name>":
+  its "Maximum number of days" should read 60.
+
+  ----- 中文說明 -----
+
+  設定 /etc/login.defs,讓「從現在起新建立」的每一個使用者,密碼最長
+  60 天就到期。
+
+    - 改的是 /etc/login.defs 裡的預設值——這是 useradd 建立新帳號時
+      會讀的檔。不要只對某個現有帳號跑 chage,那只會影響那一個帳號。
+
+    - 現有帳號不用動。本題考的是「你改完之後新建」的帳號會套到的
+      預設值。
+
+  自我驗證:建一個測試帳號,跑「chage -l <名稱>」,它的
+  「Maximum number of days」應該是 60。
+EOF
+}
+
+_login_defs_set() {
+    grep -Eq '^[[:space:]]*PASS_MAX_DAYS[[:space:]]+60([[:space:]]|$)' /etc/login.defs
+}
+
+# The real proof: a brand-new account must inherit the 60-day maximum.
+# This catches the classic mistake of running chage on an existing user
+# instead of editing the default in /etc/login.defs.
+_new_user_inherits() {
+    local max
+    lab_user_del "$LAB_TESTUSER"
+    useradd "$LAB_TESTUSER" 2>/dev/null || return 1
+    max=$(getent shadow "$LAB_TESTUSER" 2>/dev/null | cut -d: -f5)
+    lab_user_del "$LAB_TESTUSER"
+    [ "$max" = "$LAB_TARGET_MAX" ]
+}
+
+lab_setup() {
+    lab_user_del "$LAB_TESTUSER"
+    # Reset the default to the stock value so the exercise is repeatable and
+    # meaningful (otherwise a previous pass would leave the answer in place).
+    if grep -Eq '^[[:space:]]*PASS_MAX_DAYS[[:space:]]+' /etc/login.defs; then
+        sed -i -E 's/^([[:space:]]*PASS_MAX_DAYS[[:space:]]+).*/\199999/' /etc/login.defs
+    fi
+    printf '\n  /etc/login.defs default is back to 99999.\n'
+    printf '  Edit it so that NEW users get a 60-day password maximum.\n'
+    return 0
+}
+
+lab_grade() {
+    grade_test "PASS_MAX_DAYS is set to 60 in /etc/login.defs" _login_defs_set
+    grade_test "a newly created user inherits the 60-day maximum" _new_user_inherits
+}
+
+lab_finish() {
+    lab_user_del "$LAB_TESTUSER"
+    return 0
+}

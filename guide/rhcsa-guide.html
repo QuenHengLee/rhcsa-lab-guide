@@ -94,7 +94,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <div class="wrap">
 <p class="eyebrow">servera / serverb · Rocky Linux 10 · 33 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 34 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 35 題可自動評分的 RHCSA 練習。每題固定走同一套流程,本手冊給出每題的標準解法。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -109,7 +109,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <h2 style="margin-top:24px">目錄</h2>
 <ul class="toc">
   <li><a href="#t01"><span class="tno">01</span>essential-tools <span class="cnt">3 題</span></a></li>
-  <li><a href="#t02"><span class="tno">02</span>users-and-groups <span class="cnt">2 題</span></a></li>
+  <li><a href="#t02"><span class="tno">02</span>users-and-groups <span class="cnt">3 題</span></a></li>
   <li><a href="#t03"><span class="tno">03</span>permissions <span class="cnt">3 題</span></a></li>
   <li><a href="#t04"><span class="tno">04</span>storage <span class="cnt">5 題</span></a></li>
   <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">2 題</span></a></li>
@@ -176,7 +176,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <section class="topic" id="t02"><h2><span class="no">02</span>users-and-groups 使用者與群組</h2>
 
 <article class="ex" id="users-basic">
-<header><span class="name">users-basic</span><h3>Users, groups, shells, UIDs, ageing<span class="zh">帳號、群組、shell、UID 與密碼期限</span></h3><span class="examtag">#使用者群組</span><span class="node">servera</span></header>
+<header><span class="name">users-basic</span><h3>Users, groups, shells, UIDs, ageing<span class="zh">帳號、群組、shell、UID 與密碼期限</span></h3><span class="examtag">#使用者群組 #nologin</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start users-basic</pre>
 <p>建立群組 manager;natasha/harry 以它為附加群組;sarah 用 nologin 且不屬於 manager;jean 的 UID 為 4332;四人密碼都是 <code>Redhat123!</code>;natasha 密碼最長 30 天。</p></div>
@@ -215,6 +215,30 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <span class="p">#</span> lab grade users-sudo</pre></div>
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish users-sudo</pre></div>
 </div></article>
+
+<article class="ex" id="users-login-defs">
+<header><span class="name">users-login-defs</span><h3>Default password aging for future users<span class="zh">設定未來新帳號的預設密碼期限</span></h3><span class="examtag">#login.defs</span><span class="node">servera</span></header>
+<div class="phase"><h4>① 啟動</h4>
+<pre class="term"><span class="p">$</span> lab start users-login-defs</pre>
+<p>設定 <code>/etc/login.defs</code>,讓「<strong>之後新建立</strong>」的每個使用者,密碼最長 60 天到期。注意:改的是「未來帳號的預設值」,不是對某個現有帳號跑 chage。</p></div>
+<div class="phase"><h4>② 概念:login.defs vs chage(最容易搞混)</h4>
+<p>兩個都在管密碼期限,但作用對象<strong>相反</strong>——這正是考點:</p>
+<pre class="term">chage -M 60 alice        <span class="c"># 改「一個現有帳號」alice</span>
+改 /etc/login.defs        <span class="c"># 設「之後新建的所有帳號」的預設</span></pre>
+<p>題目說「<strong>往後建立的</strong>使用者密碼 60 天到期」→ 改 login.defs;說「<strong>把 alice</strong> 的密碼設成 60 天」→ 用 chage。看到「未來/新建/所有」就是 login.defs。</p></div>
+<div class="phase"><h4>② 逐步解法</h4>
+<pre class="term"><span class="p">#</span> vi /etc/login.defs
+  <span class="c"># 找到 PASS_MAX_DAYS 那行,把值改成 60:</span>
+  <span class="c">PASS_MAX_DAYS   60</span></pre>
+<p>改完<strong>不影響現有帳號</strong>(它們沿用建立當時的值),只對「之後 useradd 的新帳號」生效——這是最容易被扣分的觀念。同區還有 <code>PASS_MIN_DAYS</code>(最短)、<code>PASS_WARN_AGE</code>(警告天數)可一併設。</p></div>
+<div class="duo">
+<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="c"># 建一個測試帳號,看它有沒有繼承 60:</span>
+<span class="p">#</span> useradd t1; chage -l t1 | grep Maximum
+<span class="p">#</span> userdel -r t1
+<span class="p">#</span> lab grade users-login-defs</pre></div>
+<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish users-login-defs</pre></div>
+</div>
+<p class="note">評分的第二項會<strong>實際新建一個帳號驗證它繼承到 60 天</strong>——所以你若偷懶用 chage 改現有帳號,這項一定 FAIL,逼你改對地方(login.defs)。</p></article>
 </section>
 
 <!-- ============ 03 ============ -->
