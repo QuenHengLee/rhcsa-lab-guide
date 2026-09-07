@@ -97,9 +97,9 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </style>
 
 <div class="wrap">
-<p class="eyebrow">servera / serverb · Rocky Linux 10 · 37 exercises</p>
+<p class="eyebrow">servera / serverb · Rocky Linux 10 · 36 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 37 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 36 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -121,10 +121,9 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
   <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">5 題</span></a></li>
   <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">3 題</span></a></li>
   <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">5 題</span></a></li>
-  <li><a href="#t09"><span class="tno">09</span>containers <span class="cnt">1 題</span></a></li>
-  <li><a href="#t10"><span class="tno">10</span>shell-scripting <span class="cnt">1 題</span></a></li>
-  <li><a href="#t11"><span class="tno">11</span>processes-and-logs <span class="cnt">2 題</span></a></li>
-  <li><a href="#t12"><span class="tno">12</span>software + boot <span class="cnt">4 題</span></a></li>
+  <li><a href="#t10"><span class="tno">09</span>shell-scripting <span class="cnt">1 題</span></a></li>
+  <li><a href="#t11"><span class="tno">10</span>processes-and-logs <span class="cnt">2 題</span></a></li>
+  <li><a href="#t12"><span class="tno">11</span>software + boot <span class="cnt">3 題</span></a></li>
 </ul>
 
 <!-- ============ 01 ============ -->
@@ -768,37 +767,8 @@ DocumentRoot "/web"
 </section>
 
 <!-- ============ 09 ============ -->
-<section class="topic" id="t09"><h2><span class="no">09</span>containers 容器</h2>
-
-<article class="ex" id="podman-basic">
-<header><span class="name">podman-basic</span><h3>Rootless container, started at boot<span class="zh">rootless 容器 + 開機自啟</span></h3><span class="node">servera(需網路)</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start podman-basic</pre>
-<p>全程以 contuser(rootless)操作:拉 ubi9 映像、跑名為 labcache 的常駐容器並把 <code>~/data</code> 掛進 <code>/data</code>(:Z),最後讓它在開機時自動啟動(user unit + lingering)。</p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="c"># 先以 root 開啟 lingering(沒登入也能跑 user service):</span>
-<span class="p">#</span> loginctl enable-linger contuser
-<span class="c"># 切到 contuser(建議 ssh 進去,才有完整的 user session):</span>
-<span class="p">#</span> ssh contuser@localhost</pre>
-<pre class="term"><span class="p">$</span> podman pull registry.access.redhat.com/ubi9/ubi
-<span class="p">$</span> mkdir -p ~/data &amp;&amp; echo hello &gt; ~/data/report.txt
-<span class="p">$</span> podman run -d --name labcache \
-      -v /home/contuser/data:/data:Z \
-      registry.access.redhat.com/ubi9/ubi sleep infinity
-<span class="p">$</span> mkdir -p ~/.config/systemd/user &amp;&amp; cd ~/.config/systemd/user
-<span class="p">$</span> podman generate systemd --new --files --name labcache
-<span class="p">$</span> systemctl --user daemon-reload
-<span class="p">$</span> systemctl --user enable container-labcache.service</pre>
-<p>三個一定要記的零件:<code>:Z</code>(SELinux 重標記,漏掉容器讀不到目錄)、<code>podman generate systemd --new</code>(產生 user unit)、<code>loginctl enable-linger</code>(沒有它,登出後 user service 全滅)。若 <code>su - contuser</code> 進去遇到 systemctl --user 連不上,先 <code>export XDG_RUNTIME_DIR=/run/user/$(id -u)</code>。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> podman exec labcache ls /data   <span class="c"># report.txt</span>
-<span class="p">$</span> lab grade podman-basic</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">$</span> lab finish podman-basic</pre></div>
-</div></article>
-</section>
-
 <!-- ============ 10 ============ -->
-<section class="topic" id="t10"><h2><span class="no">10</span>shell-scripting Shell 腳本</h2>
+<section class="topic" id="t10"><h2><span class="no">09</span>shell-scripting Shell 腳本</h2>
 
 <article class="ex" id="script-bash">
 <header><span class="name">script-bash</span><h3>Loop, conditional and arguments<span class="zh">迴圈、條件與參數</span></h3><span class="node">servera</span></header>
@@ -830,7 +800,7 @@ exit 0</pre>
 </section>
 
 <!-- ============ 11 ============ -->
-<section class="topic" id="t11"><h2><span class="no">11</span>processes-and-logs 程序與日誌</h2>
+<section class="topic" id="t11"><h2><span class="no">10</span>processes-and-logs 程序與日誌</h2>
 
 <article class="ex" id="proc-nice">
 <header><span class="name">proc-nice</span><h3>nice and renice<span class="zh">nice 與 renice 調整優先權</span></h3><span class="node">servera</span></header>
@@ -870,7 +840,7 @@ CONF
 </section>
 
 <!-- ============ 12 ============ -->
-<section class="topic" id="t12"><h2><span class="no">12</span>software + boot 套件管理與開機救援</h2>
+<section class="topic" id="t12"><h2><span class="no">11</span>software + boot 套件管理與 root 密碼重設</h2>
 
 <article class="ex" id="dnf-repo">
 <header><span class="name">dnf-repo</span><h3>Enable a DNF repository<span class="zh">設定 DNF 套件庫</span></h3><span class="examtag">#套件庫</span><span class="node">servera</span></header>
@@ -952,6 +922,7 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
 <li><strong>vgreduce</strong> — 從 Volume Group 移除實體磁碟(PV)。LVM 只考建立與擴充(pvcreate / vgcreate / vgextend / lvcreate / lvextend),縮減方向不考。</li>
 <li><strong>autofs direct map(直接對映)</strong> — 老師說只考自動掛載的間接對映(indirect map),見 nfs-autofs 題。</li>
 <li><strong>手動掛載 NFS 匯出目錄</strong> — <code>mount -t nfs</code> 或寫 /etc/fstab 掛 NFS 不考;NFS 只考 autofs 自動掛載那一種。</li>
+<li><strong>Podman 容器</strong> — 整個容器主題不考(原 podman-basic 題:rootless 容器 + 開機自啟,已自手冊移除;lab 環境仍可用 <code>lab start podman-basic</code> 練習)。</li>
 <li><strong>Control and troubleshoot the boot process</strong> — 開機流程管理與疑難排解不考(原 boot-rescue 題:emergency mode 修 fstab,已自手冊移除;lab 環境仍可用 <code>lab start boot-rescue</code> 練習)。<strong>但 recover root password 必考</strong>,見 boot-rootpw 題。</li>
 </ul>
 </section>
