@@ -1,0 +1,188 @@
+<title>systemctl 用法速查</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F6F7F5; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --line:#DCE3DE; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A; --term-hl:#E4C57C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:33px;font-weight:700;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 8px;max-width:64ch;font-size:16.5px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.9em;background:var(--chip);padding:1px 6px;border-radius:4px}
+h2{font-size:21px;font-weight:700;margin:0 0 4px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px}
+section{margin-top:44px;border-top:2px solid var(--accent);padding-top:14px}
+.sub{color:var(--muted);margin:0 0 8px;max-width:70ch}
+.tablebox{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;font-size:14.5px;width:100%}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+td:first-child code{white-space:nowrap}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative;font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+pre.term .hl{color:var(--term-hl)}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.note code{background:transparent;color:inherit}
+figure{margin:16px 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;overflow-x:auto}
+figure svg{display:block;max-width:100%;height:auto;margin:0 auto}
+figcaption{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.7}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--term-ink);background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · 服務與開機 · 一頁記熟</p>
+<h1>systemctl 用法速查</h1>
+<p class="lede"><code>systemctl</code> 是管理 systemd「單元(unit)」的總指令——服務、timer、掛載點、開機目標都是 unit。RHCSA 幾乎每個服務題都在用它。這頁把常用的 <code>systemctl &lt;動作&gt; &lt;UNIT&gt;</code> 分類整理,並講清楚最容易搞混的 enable vs start。</p>
+
+<!-- 0 unit -->
+<section>
+<h2><span class="no">0</span>什麼是 unit</h2>
+<p class="sub">unit 是 systemd 管理的一個「東西」,用副檔名區分類型。服務名可以省略 <code>.service</code>:<code>systemctl start httpd</code> = <code>systemctl start httpd.service</code>。</p>
+<div class="tablebox"><table>
+<tr><th>副檔名</th><th>是什麼</th><th>例</th></tr>
+<tr><td><code>.service</code></td><td>服務(常駐程式)</td><td>httpd.service、sshd.service</td></tr>
+<tr><td><code>.timer</code></td><td>定時觸發器</td><td>labreport.timer</td></tr>
+<tr><td><code>.target</code></td><td>一組狀態(開機目標)</td><td>multi-user.target</td></tr>
+<tr><td><code>.mount</code></td><td>掛載點</td><td>由 fstab 產生</td></tr>
+<tr><td><code>.socket</code></td><td>監聽通訊端</td><td>cockpit.socket</td></tr>
+</table></div>
+</section>
+
+<!-- 1 lifecycle -->
+<section>
+<h2><span class="no">1</span>當下控制:開/關/重啟</h2>
+<p class="sub">這些只影響「現在執行中的狀態」,重開機後不保證還在(那要靠第 2 節的 enable)。</p>
+<div class="tablebox"><table>
+<tr><th>指令</th><th>作用</th></tr>
+<tr><td><code>systemctl start UNIT</code></td><td>立即啟動</td></tr>
+<tr><td><code>systemctl stop UNIT</code></td><td>立即停止</td></tr>
+<tr><td><code>systemctl restart UNIT</code></td><td>重啟(停了再開)</td></tr>
+<tr><td><code>systemctl reload UNIT</code></td><td>重讀設定但不中斷連線(僅部分服務支援)</td></tr>
+<tr><td><code>systemctl reload-or-restart UNIT</code></td><td>能 reload 就 reload,否則 restart</td></tr>
+</table></div>
+</section>
+
+<!-- 2 boot -->
+<section>
+<h2><span class="no">2</span>開機persistence:enable/disable/mask</h2>
+<p class="sub">這些決定「重開機後要不要自動啟動」,以及能不能被啟動。RHCSA 服務題的分數大多在這裡。</p>
+<div class="tablebox"><table>
+<tr><th>指令</th><th>作用</th></tr>
+<tr><td><code>systemctl enable UNIT</code></td><td>設定「開機時自動啟動」(但<strong>不會馬上</strong>啟動)</td></tr>
+<tr><td><code>systemctl enable --now UNIT</code></td><td>★ enable + 立即 start,一次到位(最常用)</td></tr>
+<tr><td><code>systemctl disable UNIT</code></td><td>取消開機自動啟動(<strong>不會停掉</strong>正在跑的)</td></tr>
+<tr><td><code>systemctl disable --now UNIT</code></td><td>disable + 立即 stop</td></tr>
+<tr><td><code>systemctl mask UNIT</code></td><td>遮蔽:連到 /dev/null,<strong>完全無法啟動</strong>(手動、被相依都不行)</td></tr>
+<tr><td><code>systemctl unmask UNIT</code></td><td>解除遮蔽</td></tr>
+</table></div>
+<div class="note"><strong>disable ≠ mask:</strong>disable 只是「不隨開機啟動」,仍可手動或被別的服務拉起;mask 是「上鎖,誰都啟動不了」。題目說「確保某服務絕對不會被啟動」→ 用 <code>mask</code>。</div>
+</section>
+
+<!-- diagram enable vs start -->
+<section>
+<h2><span class="no">3</span>最容易搞混:enable vs start</h2>
+<p class="sub">這是 RHCSA 服務題的頭號陷阱。兩者是<strong>互相獨立</strong>的兩件事:</p>
+<figure>
+<svg viewBox="0 0 720 210" role="img" aria-label="enable 決定開機是否自動啟動,start 決定現在是否執行,兩者獨立;enable --now 兩者都做">
+<g font-family="Noto Sans TC,sans-serif">
+<rect x="30" y="30" width="300" height="70" rx="10" fill="var(--accent-soft)" stroke="#0E7C5B" stroke-width="1.6"/>
+<text x="180" y="58" text-anchor="middle" font-size="14" font-weight="700" fill="#0A5C44">start / stop</text>
+<text x="180" y="82" text-anchor="middle" font-size="12.5" fill="#1E2622">管「現在」有沒有在跑</text>
+<rect x="390" y="30" width="300" height="70" rx="10" fill="var(--accent-soft)" stroke="#0E7C5B" stroke-width="1.6"/>
+<text x="540" y="58" text-anchor="middle" font-size="14" font-weight="700" fill="#0A5C44">enable / disable</text>
+<text x="540" y="82" text-anchor="middle" font-size="12.5" fill="#1E2622">管「開機」會不會自動啟動</text>
+<line x1="360" y1="65" x2="386" y2="65" stroke="currentColor" stroke-width="1.4"/>
+<text x="360" y="55" text-anchor="middle" font-size="14" fill="var(--muted)">×</text>
+<text x="360" y="130" text-anchor="middle" font-size="12" fill="var(--muted)">兩者互不影響</text>
+<rect x="150" y="150" width="420" height="44" rx="10" fill="#fff" stroke="#0E7C5B" stroke-width="2"/>
+<text x="360" y="177" text-anchor="middle" font-size="13.5" font-weight="600" fill="#0A5C44">enable --now = 兩件事一次做完(最省事)</text>
+</g>
+</svg>
+<figcaption>只 <code>start</code> 沒 <code>enable</code>:現在有跑,但重開機後不見了。只 <code>enable</code> 沒 <code>start</code>:設好了開機自動啟動,但現在還沒跑。考題通常要「現在就要有、以後也要有」→ 一律 <code>systemctl enable --now UNIT</code> 一步到位。</figcaption>
+</figure>
+</section>
+
+<!-- 4 inspect -->
+<section>
+<h2><span class="no">4</span>查看狀態</h2>
+<div class="tablebox"><table>
+<tr><th>指令</th><th>作用</th></tr>
+<tr><td><code>systemctl status UNIT</code></td><td>完整狀態(執行中?最近日誌?)</td></tr>
+<tr><td><code>systemctl is-active UNIT</code></td><td>現在有沒有在跑(印 active/inactive)</td></tr>
+<tr><td><code>systemctl is-enabled UNIT</code></td><td>開機會不會自動啟動(印 enabled/disabled/masked)</td></tr>
+<tr><td><code>systemctl is-failed UNIT</code></td><td>是不是失敗狀態</td></tr>
+<tr><td><code>systemctl cat UNIT</code></td><td>看這個 unit 的設定檔內容</td></tr>
+<tr><td><code>systemctl list-units --type=service</code></td><td>列出目前載入的服務</td></tr>
+<tr><td><code>systemctl list-unit-files</code></td><td>列出所有 unit 及其 enable 狀態</td></tr>
+<tr><td><code>systemctl list-timers</code></td><td>列出所有 timer 與下次觸發時間</td></tr>
+</table></div>
+<pre class="term"><span class="p">#</span> systemctl is-enabled --quiet httpd &amp;&amp; echo yes   <span class="c"># 腳本/評分常用</span></pre>
+</section>
+
+<!-- 5 systemwide -->
+<section>
+<h2><span class="no">5</span>系統層級(不接 UNIT 或接 target)</h2>
+<div class="tablebox"><table>
+<tr><th>指令</th><th>作用</th></tr>
+<tr><td><code>systemctl daemon-reload</code></td><td>改了 unit 檔或 fstab 後,叫 systemd 重讀設定</td></tr>
+<tr><td><code>systemctl get-default</code></td><td>查目前預設開機 target</td></tr>
+<tr><td><code>systemctl set-default multi-user.target</code></td><td>設定預設開機 target(文字模式)</td></tr>
+<tr><td><code>systemctl isolate multi-user.target</code></td><td>「立刻」切到某 target(不重開機)</td></tr>
+<tr><td><code>systemctl reboot</code> / <code>poweroff</code></td><td>重開機 / 關機</td></tr>
+</table></div>
+<div class="note"><strong>改了 unit 檔一定要 <code>daemon-reload</code>:</strong>你新增/編輯 <code>/etc/systemd/system/xxx.service</code> 後,systemd 手上還是舊的,必須 <code>daemon-reload</code> 讓它重讀,再 <code>enable --now</code>。timer 題、service 題都會用到。</div>
+</section>
+
+<!-- 6 recipes -->
+<section>
+<h2><span class="no">6</span>考題常見組合</h2>
+<pre class="term"><span class="c"># 服務要「現在跑 + 開機自動」:</span>
+<span class="p">#</span> systemctl enable --now firewalld
+
+<span class="c"># 某服務要「絕對不能被啟動」:</span>
+<span class="p">#</span> systemctl mask --now httpd
+
+<span class="c"># 改回文字模式開機:</span>
+<span class="p">#</span> systemctl set-default multi-user.target
+
+<span class="c"># 建好 timer 之後(先 daemon-reload,再 enable timer 而非 service):</span>
+<span class="p">#</span> systemctl daemon-reload
+<span class="p">#</span> systemctl enable --now labreport.timer
+
+<span class="c"># 驗證三連(對應 is-active / is-enabled / status):</span>
+<span class="p">#</span> systemctl is-active httpd; systemctl is-enabled httpd</pre>
+<div class="note">記一條黃金公式就夠應付八成服務題:<strong><code>systemctl enable --now &lt;服務&gt;</code></strong> —— 現在就啟動、開機也自動。剩下的特例:要鎖死用 <code>mask</code>、改開機模式用 <code>set-default</code>、改過 unit 檔先 <code>daemon-reload</code>。</div>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗'; if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});}
+      else{var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy');}catch(e){}document.body.removeChild(ta);done(ok);}
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

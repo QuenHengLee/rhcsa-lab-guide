@@ -1,0 +1,170 @@
+<title>Bash 腳本基礎</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F6F7F5; --card:#FFFFFF; --ink:#1E2622; --muted:#5B6B62;
+  --accent:#0E7C5B; --accent-ink:#0A5C44; --accent-soft:#DCEDE5;
+  --line:#DCE3DE; --chip:#EBF1ED;
+  --warn-bg:#FBF3E4; --warn-ink:#7A5A18; --warn-line:#E8D9B5;
+  --term-bg:#101915; --term-ink:#D9E6DE; --term-prompt:#4FC08D; --term-cmt:#7E948A; --term-hl:#E4C57C; --term-out:#93A39A;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.75 "Noto Sans TC","IBM Plex Sans",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:840px;margin:0 auto;padding:48px 24px 96px}
+h1,h2{font-family:"IBM Plex Sans","Noto Sans TC",system-ui,sans-serif;text-wrap:balance;line-height:1.3}
+h1{font-size:33px;font-weight:700;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 8px;max-width:64ch;font-size:16.5px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.9em;background:var(--chip);padding:1px 6px;border-radius:4px}
+h2{font-size:21px;font-weight:700;margin:0 0 4px}
+h2 .no{color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:15px;margin-right:10px}
+section{margin-top:44px;border-top:2px solid var(--accent);padding-top:14px}
+.sub{color:var(--muted);margin:0 0 8px;max-width:70ch}
+.tablebox{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;font-size:14.5px;width:100%}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--chip);font-weight:600;font-family:"IBM Plex Sans","Noto Sans TC",sans-serif}
+td:first-child code{white-space:nowrap}
+pre.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;padding:14px 16px;margin:12px 0;overflow-x:auto;position:relative;font:400 13.5px/1.7 "IBM Plex Mono",Consolas,monospace}
+pre.term .p{color:var(--term-prompt);font-weight:600}
+pre.term .c{color:var(--term-cmt)}
+pre.term .hl{color:var(--term-hl)}
+pre.term .o{color:var(--term-out)}
+.note{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:8px;padding:8px 14px;margin:12px 0;font-size:14.5px}
+.note code{background:transparent;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre.term{position:relative}
+.copybtn{position:absolute;top:7px;right:7px;z-index:2;font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--term-ink);background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:4px 9px;cursor:pointer;opacity:0;transition:opacity .15s}
+pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn.ok{color:var(--term-prompt);border-color:var(--term-prompt);opacity:1}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">RHCSA · shell scripting · 只考基本、夠用就好</p>
+<h1>Bash 腳本基礎</h1>
+<p class="lede">RHCSA 的腳本題不難:一個迴圈、一個條件判斷、比較字串或數字、看退出狀態。這頁把最常用的幾塊講清楚——退出狀態 <code>$?</code>、測試 <code>[[ ]]</code>、字串/數字比較、<code>if...then...fi</code>。</p>
+
+<!-- 1 exit status -->
+<section>
+<h2><span class="no">1</span>退出狀態 <code>$?</code>:成功還是失敗</h2>
+<p class="sub">每個指令跑完都會留下一個「退出碼」:<strong>0 = 成功,非 0 = 失敗</strong>。用 <code>echo $?</code> 看上一個指令的退出碼——這是判斷、除錯的基礎。</p>
+<pre class="term"><span class="p">$</span> ls /etc/passwd
+<span class="o">/etc/passwd</span>
+<span class="p">$</span> echo $?
+<span class="o">0</span>          <span class="c"># 成功</span>
+<span class="p">$</span> ls /no/such/file
+<span class="o">ls: cannot access ...</span>
+<span class="p">$</span> echo $?
+<span class="o">2</span>          <span class="c"># 非 0 = 失敗</span></pre>
+<div class="note"><code>$?</code> 只反映「最後一個」指令。想用某指令的結果做判斷,要<strong>緊接著</strong>取 <code>$?</code>,或直接把它放進 <code>if</code>(見第 4 節)。腳本裡用 <code>exit 0</code> / <code>exit 2</code> 自訂自己的退出碼。</div>
+</section>
+
+<!-- 2 test -->
+<section>
+<h2><span class="no">2</span>測試:<code>[[ ... ]]</code></h2>
+<p class="sub">要「判斷條件成不成立」,用測試語法。它本身就是一個指令,成立→退出碼 0,不成立→退出碼 1。</p>
+<pre class="term"><span class="p">$</span> [[ abc = abc ]]; echo $?
+<span class="o">0</span>          <span class="c"># 相等 → 成立 → 0</span>
+<span class="p">$</span> [[ abc = xyz ]]; echo $?
+<span class="o">1</span>          <span class="c"># 不相等 → 不成立 → 1</span></pre>
+<p class="sub">兩種寫法都可以,RHEL 上建議用 <code>[[ ]]</code>(較新、較不易踩空白/萬用字元的雷):</p>
+<div class="tablebox"><table>
+<tr><th>寫法</th><th>說明</th></tr>
+<tr><td><code>[[ 條件 ]]</code></td><td>bash 內建,較安全,支援 <code>&amp;&amp;</code> <code>||</code>、萬用字元比對。<strong>建議用這個</strong></td></tr>
+<tr><td><code>[ 條件 ]</code></td><td>傳統 <code>test</code> 指令,POSIX 通用。中括號內外都要有空格</td></tr>
+</table></div>
+<div class="note"><strong>空格是必須的:</strong><code>[[ abc = abc ]]</code> 對;<code>[[abc=abc]]</code> 錯(中括號和內容之間、等號兩邊都要空格)。這是最常見的語法錯誤。</div>
+</section>
+
+<!-- 3 comparisons -->
+<section>
+<h2><span class="no">3</span>比較運算子:字串 vs 數字</h2>
+<p class="sub">字串和數字用<strong>不同的運算子</strong>——這是考點,別混用。</p>
+<div class="tablebox"><table>
+<tr><th>比較</th><th>字串</th><th>數字</th></tr>
+<tr><td>相等</td><td><code>=</code> 或 <code>==</code></td><td><code>-eq</code></td></tr>
+<tr><td>不相等</td><td><code>!=</code></td><td><code>-ne</code></td></tr>
+<tr><td>大於</td><td><code>&gt;</code>(字典序)</td><td><code>-gt</code></td></tr>
+<tr><td>小於</td><td><code>&lt;</code>(字典序)</td><td><code>-lt</code></td></tr>
+<tr><td>大於等於</td><td>—</td><td><code>-ge</code></td></tr>
+<tr><td>小於等於</td><td>—</td><td><code>-le</code></td></tr>
+<tr><td>是空字串</td><td><code>-z 字串</code></td><td>—</td></tr>
+<tr><td>非空字串</td><td><code>-n 字串</code></td><td>—</td></tr>
+</table></div>
+<pre class="term"><span class="c"># 字串:= 和 == 在 [[ ]] 裡等效</span>
+<span class="p">$</span> [[ "$USER" == root ]]; echo $?
+<span class="c"># 字串不等於</span>
+<span class="p">$</span> [[ "$a" != "$b" ]]
+<span class="c"># 數字:一定用 -eq / -lt 這類,不能用 = / &lt;</span>
+<span class="p">$</span> [[ $# -eq 0 ]]          <span class="c"># 參數個數等於 0?</span>
+<span class="p">$</span> [[ $count -gt 10 ]]     <span class="c"># count 大於 10?</span></pre>
+<div class="note"><strong>最常見的錯:</strong>拿 <code>=</code> 去比數字(<code>[[ $n = 5 ]]</code> 其實是字串比較,"05" 就不等於 "5")、或拿 <code>-eq</code> 去比字串。口訣:<strong>字串用 =/==/!=,數字用 -eq/-ne/-lt/-gt</strong>。</div>
+</section>
+
+<!-- 4 if -->
+<section>
+<h2><span class="no">4</span>條件:<code>if ... then ... fi</code></h2>
+<p class="sub">結構固定:<code>if</code> 後面接一個「指令或測試」,它退出碼 0 就執行 <code>then</code> 區塊。結尾一定是 <code>fi</code>(if 反過來拼)。</p>
+<pre class="term">if [[ $# -eq 0 ]]; then
+    echo "沒有參數"
+elif [[ $# -eq 1 ]]; then
+    echo "剛好一個參數"
+else
+    echo "多個參數"
+fi</pre>
+<p class="sub">幾個要點:</p>
+<ul class="sub">
+<li><code>then</code> 可以跟 <code>if</code> 同一行(用 <code>;</code> 隔開),或另起一行。</li>
+<li><code>elif</code>(else if)、<code>else</code> 可省略;最基本就是 <code>if ... then ... fi</code>。</li>
+<li><code>if</code> 後面不一定要 <code>[[ ]]</code>——任何指令都行,它判斷的是該指令的退出碼:</li>
+</ul>
+<pre class="term"><span class="c"># 直接拿指令的成敗當條件(id 成功=使用者存在)</span>
+if id alice &amp;&gt;/dev/null; then
+    echo "alice 存在"
+else
+    echo "alice 不存在"
+fi</pre>
+<div class="note"><code>&amp;&gt;/dev/null</code> 把指令的輸出丟掉,只取它的「成功/失敗」。這招在腳本判斷「某帳號/檔案存不存在」時很常用。</div>
+</section>
+
+<!-- 5 full example -->
+<section>
+<h2><span class="no">5</span>組起來:一個完整小腳本</h2>
+<p class="sub">把上面全部用上——這就是 script-bash 練習題的縮影:</p>
+<pre class="term">#!/bin/bash
+<span class="c"># 沒給參數就印用法、以狀態 2 結束</span>
+if [[ $# -eq 0 ]]; then
+    echo "usage: $0 USER [USER...]"
+    exit 2
+fi
+<span class="c"># 逐一處理每個參數</span>
+for u in "$@"; do
+    if id "$u" &amp;&gt;/dev/null; then
+        echo "$u:$(id -u "$u")"
+    else
+        echo "$u:NOT FOUND"
+    fi
+done
+exit 0</pre>
+<div class="note">四個零件:<code>$#</code>(參數個數)、<code>$@</code>(所有參數)、<code>$0</code>(腳本名)、<code>for ... in "$@"</code>(逐一走訪)。<code>"$@"</code> 一定加雙引號,含空格的參數才不會被拆錯。寫完 <code>chmod +x 腳本</code> 才能執行。</div>
+</section>
+
+</div>
+<script>
+(function(){
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var btn=document.createElement('button');
+    btn.className='copybtn'; btn.type='button'; btn.textContent='複製';
+    btn.addEventListener('click',function(){
+      var clone=pre.cloneNode(true);
+      clone.querySelectorAll('.p,.c,.o,.copybtn').forEach(function(s){s.remove();});
+      var text=clone.textContent.replace(/^[ \t]+/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+      var done=function(ok){ btn.textContent=ok?'已複製':'失敗'; if(ok)btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='複製';btn.classList.remove('ok');},1500); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){done(1);},function(){done(0);});}
+      else{var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy');}catch(e){}document.body.removeChild(ta);done(ok);}
+    });
+    pre.appendChild(btn);
+  });
+})();
+</script>

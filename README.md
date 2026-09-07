@@ -18,6 +18,8 @@ A self-contained practice environment and bilingual (English + 繁體中文) stu
 | `guide/nfs-autofs.html` | **NFS 與 autofs 圖解**:匯出/掛載、autofs 生命週期、間接對映兩檔接力 |
 | `guide/rootpw-reset.html` | **重設 root 密碼詳解**:init=/bin/bash 法七步逐一拆解 + 常見錯誤 |
 | `guide/man-guide.html` | **man 手冊速成**:less 快捷鍵、章節編號、照抄 EXAMPLES 的考場動線 |
+| `guide/systemctl-guide.html` | **systemctl 用法速查**:enable vs start、mask、開機 target、daemon-reload |
+| `guide/bash-essentials.html` | **Bash 腳本基礎**:$? 退出碼、[[ ]] 測試、字串/數字比較、if...then...fi |
 | `labs/*.lab` | 38 個練習題定義(題目、環境佈置、自動評分、清理),中英雙語題目敘述 |
 | `setup/` | 部署腳本、`lab` 主程式、共用函式庫、彩色提示字元設定 |
 
