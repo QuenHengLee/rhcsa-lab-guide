@@ -97,9 +97,9 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </style>
 
 <div class="wrap">
-<p class="eyebrow">servera / serverb · Rocky Linux 10 · 35 exercises</p>
+<p class="eyebrow">servera / serverb · Rocky Linux 10 · 31 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 35 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 31 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -116,13 +116,13 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
   <li><a href="#t01"><span class="tno">01</span>essential-tools <span class="cnt">4 題</span></a></li>
   <li><a href="#t02"><span class="tno">02</span>users-and-groups <span class="cnt">3 題</span></a></li>
   <li><a href="#t03"><span class="tno">03</span>permissions <span class="cnt">3 題</span></a></li>
-  <li><a href="#t04"><span class="tno">04</span>storage <span class="cnt">5 題</span></a></li>
-  <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">2 題</span></a></li>
-  <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">5 題</span></a></li>
+  <li><a href="#t04"><span class="tno">04</span>storage <span class="cnt">4 題</span></a></li>
+  <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">1 題</span></a></li>
+  <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">4 題</span></a></li>
   <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">3 題</span></a></li>
   <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">4 題</span></a></li>
   <li><a href="#t10"><span class="tno">09</span>shell-scripting <span class="cnt">1 題</span></a></li>
-  <li><a href="#t11"><span class="tno">10</span>processes-and-logs <span class="cnt">2 題</span></a></li>
+  <li><a href="#t11"><span class="tno">10</span>processes-and-logs <span class="cnt">1 題</span></a></li>
   <li><a href="#t12"><span class="tno">11</span>software + boot <span class="cnt">3 題</span></a></li>
 </ul>
 
@@ -350,7 +350,7 @@ drwxrws--T. ... root accounting ...
 <p class="note">練習碟是 <code>/dev/nvme0n1</code> 與 <code>/dev/nvme0n2</code>;系統碟 <code>/dev/sda</code> 絕對不要動。改完 <code>/etc/fstab</code> 一定用 <code>mount -a</code> 測試——fstab 打錯字是「下次開不了機」等級的錯誤。若 mount 警告 fstab 已變更,跑一下 <code>systemctl daemon-reload</code> 消掉即可,不影響評分。</p>
 
 <article class="ex" id="storage-partition">
-<header><span class="name">storage-partition</span><h3>Partition, XFS, mount by UUID<span class="zh">分割、XFS、以 UUID 持久掛載</span></h3><span class="node">servera</span></header>
+<header><span class="name">storage-partition</span><h3>Partition, XFS, mount by UUID<span class="zh">分割、XFS、以 UUID 持久掛載</span></h3><span class="examtag">#分割 #UUID掛載</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start storage-partition</pre>
 <p>在 nvme0n1 建 2 GiB 分割區、做 XFS、掛載 <code>/mnt/data</code>,fstab 必須用 UUID。</p></div>
@@ -425,46 +425,10 @@ drwxrws--T. ... root accounting ...
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-swap</pre></div>
 </div></article>
 
-<article class="ex" id="storage-stratis">
-<header><span class="name">storage-stratis</span><h3>Stratis pool, filesystem, snapshot<span class="zh">Stratis pool、檔案系統與快照</span></h3><span class="node">servera</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start storage-stratis</pre>
-<p>用 nvme0n1 建 pool「stratispool」、檔案系統「stratisfs」,持久掛載 <code>/stratisvolume</code>(要加 <code>x-systemd.requires=stratisd.service</code>),最後做快照「stratissnap」。</p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="p">#</span> systemctl enable --now stratisd
-<span class="p">#</span> stratis pool create stratispool /dev/nvme0n1
-<span class="p">#</span> stratis filesystem create stratispool stratisfs
-<span class="p">#</span> mkdir -p /stratisvolume
-<span class="p">#</span> blkid /dev/stratis/stratispool/stratisfs   <span class="c"># 抄下 UUID</span>
-<span class="p">#</span> echo 'UUID=這裡貼UUID /stratisvolume xfs defaults,x-systemd.requires=stratisd.service 0 0' &gt;&gt; /etc/fstab
-<span class="p">#</span> mount /stratisvolume
-<span class="p">#</span> stratis filesystem snapshot stratispool stratisfs stratissnap</pre>
-<p>Stratis 檔案系統的 fstab 類型寫 <code>xfs</code>;<code>x-systemd.requires</code> 讓 systemd 等 stratisd 起來才掛,漏了這個下次開機會卡 emergency mode。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> stratis filesystem list
-<span class="p">#</span> lab grade storage-stratis</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish storage-stratis</pre></div>
-</div></article>
 </section>
 
 <!-- ============ 05 ============ -->
 <section class="topic" id="t05"><h2><span class="no">05</span>network-filesystems 網路檔案系統</h2>
-
-<article class="ex" id="files-rsync">
-<header><span class="name">files-rsync</span><h3>Mirror a directory with rsync<span class="zh">rsync 鏡像到 serverb</span></h3><span class="node">servera → serverb</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start files-rsync</pre>
-<p>把 servera 的 <code>/opt/labdata</code> 精確鏡像到 serverb 的 <code>/opt/labdata-backup</code>:權限/擁有者/時間都要保留,serverb 上多出來的 obsolete.txt 要刪掉。<strong>serverb 必須開機。</strong></p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="p">#</span> rsync -av --delete /opt/labdata/ root@serverb:/opt/labdata-backup/
-  <span class="c"># root@serverb 密碼:student</span></pre>
-<p>三個關鍵:<code>-a</code>(archive,保留權限/擁有者/mtime)、<code>--delete</code>(刪除目的端多餘檔案)、來源結尾的「/」(複製內容而非目錄本身)。要保留擁有者,目的端須以 root 寫入,所以用 root@serverb。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> rsync -avn --delete /opt/labdata/ root@serverb:/opt/labdata-backup/
-  <span class="c"># -n 乾跑,無輸出差異即同步完成</span>
-<span class="p">#</span> lab grade files-rsync</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish files-rsync</pre></div>
-</div></article>
 
 <article class="ex" id="nfs-autofs">
 <header><span class="name">nfs-autofs</span><h3>Automount an NFS export with autofs<span class="zh">autofs 自動掛載 NFS</span></h3><span class="examtag">#autofs</span><span class="node">servera ← serverb</span></header>
@@ -486,23 +450,6 @@ drwxrws--T. ... root accounting ...
 
 <!-- ============ 06 ============ -->
 <section class="topic" id="t06"><h2><span class="no">06</span>scheduling-and-services 排程與服務</h2>
-
-<article class="ex" id="sched-at">
-<header><span class="name">sched-at</span><h3>One-off job with at<span class="zh">at 一次性排程</span></h3><span class="node">servera</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start sched-at</pre>
-<p>以 sched1 身分排一個明天 16:00 的一次性工作,執行 <code>/usr/bin/logger "at job from the RHCSA lab"</code>。</p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="p">#</span> su - sched1
-<span class="p">$</span> echo '/usr/bin/logger "at job from the RHCSA lab"' | at 16:00 tomorrow
-<span class="p">$</span> atq          <span class="c"># 確認佇列裡恰好一筆</span>
-<span class="p">$</span> exit</pre>
-<p>用管線把指令餵給 <code>at</code> 最不容易出錯;互動式輸入的話,打完指令按 Ctrl+D 結束。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> at -c 1   <span class="c"># 編號看 atq,結尾應是 logger 指令</span>
-<span class="p">#</span> lab grade sched-at</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sched-at</pre></div>
-</div></article>
 
 <article class="ex" id="sched-cron">
 <header><span class="name">sched-cron</span><h3>Recurring job for another user<span class="zh">替他人設 cron 排程</span></h3><span class="examtag">#cron</span><span class="node">servera</span></header>
@@ -555,7 +502,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="services-control">
-<header><span class="name">services-control</span><h3>Services and the default boot target<span class="zh">服務控制與預設開機 target</span></h3><span class="node">servera</span></header>
+<header><span class="name">services-control</span><h3>Services and the default boot target<span class="zh">服務控制與預設開機 target</span></h3><span class="examtag">#systemctl #mask #target</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start services-control</pre>
 <p>把預設 target 改回 multi-user;httpd 要 mask 到完全不能啟動;atd 要 enabled 且執行中。</p></div>
@@ -665,7 +612,7 @@ UNIT
 </div></article>
 
 <article class="ex" id="sec-selinux-boolean">
-<header><span class="name">sec-selinux-boolean</span><h3>SELinux modes and booleans<span class="zh">SELinux 模式與 boolean</span></h3><span class="node">servera</span></header>
+<header><span class="name">sec-selinux-boolean</span><h3>SELinux modes and booleans<span class="zh">SELinux 模式與 boolean</span></h3><span class="examtag">#enforcing #boolean</span><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start sec-selinux-boolean</pre>
 <p>把 SELinux 改回 enforcing(立即+開機),並永久開啟 httpd_enable_homedirs 與 httpd_can_network_connect。</p></div>
@@ -787,22 +734,6 @@ exit 0</pre>
 <!-- ============ 11 ============ -->
 <section class="topic" id="t11"><h2><span class="no">10</span>processes-and-logs 程序與日誌</h2>
 
-<article class="ex" id="proc-nice">
-<header><span class="name">proc-nice</span><h3>nice and renice<span class="zh">nice 與 renice 調整優先權</span></h3><span class="node">servera</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start proc-nice</pre>
-<p>把執行中的 labload 調到 nice 10(PID 不可變);再啟動第二個實例 <code>labload 88888</code>,出生即 nice 15、登出後仍在跑。</p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="p">#</span> pgrep -a labload                 <span class="c"># 找到原有程序的 PID</span>
-<span class="p">#</span> renice -n 10 -p 原PID
-<span class="p">#</span> nohup nice -n 15 /usr/local/bin/labload 88888 &amp;</pre>
-<p>已在跑的用 <code>renice</code>、新啟動的用 <code>nice -n</code> 前綴;<code>nohup … &amp;</code> 讓它脫離終端機、登出不死。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">#</span> ps -o pid,ni,cmd -C labload   <span class="c"># NI 應為 10 與 15</span>
-<span class="p">#</span> lab grade proc-nice</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish proc-nice</pre></div>
-</div></article>
-
 <article class="ex" id="logs-journal">
 <header><span class="name">logs-journal</span><h3>Persistent systemd journal<span class="zh">journal 持久化</span></h3><span class="node">servera</span></header>
 <div class="phase"><h4>① 啟動</h4>
@@ -909,6 +840,10 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
 <li><strong>手動掛載 NFS 匯出目錄</strong> — <code>mount -t nfs</code> 或寫 /etc/fstab 掛 NFS 不考;NFS 只考 autofs 自動掛載那一種。</li>
 <li><strong>Podman 容器</strong> — 整個容器主題不考(原 podman-basic 題:rootless 容器 + 開機自啟,已自手冊移除;lab 環境仍可用 <code>lab start podman-basic</code> 練習)。</li>
 <li><strong>SSH 金鑰認證</strong> — 老師說 SSH 設定一旦出錯可能斷線、影響整個考試環境,所以不會出這種題(原 ssh-keyauth 題:ssh-keygen + ssh-copy-id 免密碼登入,已自手冊移除;lab 環境仍可用 <code>lab start ssh-keyauth</code> 練習)。</li>
+<li><strong>rsync 遠端同步</strong> — 不考(原 files-rsync 題:rsync -a --delete 鏡像到 serverb;它也要走 SSH 連線,同上邏輯)。</li>
+<li><strong>at 一次性排程</strong> — 不考(原 sched-at 題;排程只考 cron 與 systemd timer,兩題皆已標必考)。</li>
+<li><strong>nice / renice 程序優先權</strong> — 不考(原 proc-nice 題)。</li>
+<li><strong>Stratis 儲存</strong> — 不考(原 storage-stratis 題:pool/檔案系統/快照;RHEL 10 考綱已淡出)。</li>
 <li><strong>Control and troubleshoot the boot process</strong> — 開機流程管理與疑難排解不考(原 boot-rescue 題:emergency mode 修 fstab,已自手冊移除;lab 環境仍可用 <code>lab start boot-rescue</code> 練習)。<strong>但 recover root password 必考</strong>,見 boot-rootpw 題。</li>
 </ul>
 </section>
