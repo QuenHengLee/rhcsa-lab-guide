@@ -97,9 +97,9 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 </style>
 
 <div class="wrap">
-<p class="eyebrow">servera / serverb · Rocky Linux 10 · 36 exercises</p>
+<p class="eyebrow">servera / serverb · Rocky Linux 10 · 35 exercises</p>
 <h1>RHCSA 實作題解手冊</h1>
-<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 36 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
+<p class="sub">你的 VirtualBox 教室(servera:<code>ssh -p 2222 student@127.0.0.1</code>、serverb:<code>-p 2223</code>)內建 38 題可自動評分的 RHCSA 練習;本手冊收錄其中 35 題的標準解法(確認不考的主題移除後記錄在頁尾)。每題固定走同一套流程。除特別註明外,所有操作都在 <strong>servera</strong> 上以 root(<code>sudo -i</code>)執行(boot-rootpw 在 serverb)。</p>
 
 <div class="flow">
   <span class="step"><b>lab start</b> 題目名 <span style="color:var(--muted)">佈置環境+出題</span></span><span class="arr">→</span>
@@ -120,7 +120,7 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
   <li><a href="#t05"><span class="tno">05</span>network-filesystems <span class="cnt">2 題</span></a></li>
   <li><a href="#t06"><span class="tno">06</span>scheduling-and-services <span class="cnt">5 題</span></a></li>
   <li><a href="#t07"><span class="tno">07</span>network-and-time <span class="cnt">3 題</span></a></li>
-  <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">5 題</span></a></li>
+  <li><a href="#t08"><span class="tno">08</span>security <span class="cnt">4 題</span></a></li>
   <li><a href="#t10"><span class="tno">09</span>shell-scripting <span class="cnt">1 題</span></a></li>
   <li><a href="#t11"><span class="tno">10</span>processes-and-logs <span class="cnt">2 題</span></a></li>
   <li><a href="#t12"><span class="tno">11</span>software + boot <span class="cnt">3 題</span></a></li>
@@ -749,21 +749,6 @@ DocumentRoot "/web"
 <div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">#</span> lab finish sec-selinux-httpd</pre></div>
 </div></article>
 
-<article class="ex" id="ssh-keyauth">
-<header><span class="name">ssh-keyauth</span><h3>SSH key-based authentication<span class="zh">SSH 金鑰認證</span></h3><span class="node">servera → serverb</span></header>
-<div class="phase"><h4>① 啟動</h4>
-<pre class="term"><span class="p">$</span> lab start ssh-keyauth</pre>
-<p>以 student(不是 root)產生無 passphrase 金鑰,裝到 serverb,做到 <code>ssh student@serverb hostname</code> 免密碼。<strong>serverb 必須開機。</strong></p></div>
-<div class="phase"><h4>② 逐步解法</h4>
-<pre class="term"><span class="p">$</span> ssh-keygen        <span class="c"># 路徑用預設,passphrase 兩次都直接 Enter(留空)</span>
-<span class="p">$</span> ssh-copy-id student@serverb    <span class="c"># 密碼:student</span>
-<span class="p">$</span> ssh student@serverb hostname   <span class="c"># 應直接回 serverb.lab.example.com</span></pre>
-<p><code>ssh-copy-id</code> 會自動把 .ssh 設成 700、authorized_keys 設成 600,比手動 scp 省事又不會弄錯權限。</p></div>
-<div class="duo">
-<div class="phase"><h4>③ 驗證</h4><pre class="term"><span class="p">$</span> ssh student@serverb hostname
-<span class="p">$</span> lab grade ssh-keyauth</pre></div>
-<div class="phase"><h4>④ 收尾</h4><pre class="term"><span class="p">$</span> lab finish ssh-keyauth</pre></div>
-</div></article>
 </section>
 
 <!-- ============ 09 ============ -->
@@ -923,6 +908,7 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
 <li><strong>autofs direct map(直接對映)</strong> — 老師說只考自動掛載的間接對映(indirect map),見 nfs-autofs 題。</li>
 <li><strong>手動掛載 NFS 匯出目錄</strong> — <code>mount -t nfs</code> 或寫 /etc/fstab 掛 NFS 不考;NFS 只考 autofs 自動掛載那一種。</li>
 <li><strong>Podman 容器</strong> — 整個容器主題不考(原 podman-basic 題:rootless 容器 + 開機自啟,已自手冊移除;lab 環境仍可用 <code>lab start podman-basic</code> 練習)。</li>
+<li><strong>SSH 金鑰認證</strong> — 老師說 SSH 設定一旦出錯可能斷線、影響整個考試環境,所以不會出這種題(原 ssh-keyauth 題:ssh-keygen + ssh-copy-id 免密碼登入,已自手冊移除;lab 環境仍可用 <code>lab start ssh-keyauth</code> 練習)。</li>
 <li><strong>Control and troubleshoot the boot process</strong> — 開機流程管理與疑難排解不考(原 boot-rescue 題:emergency mode 修 fstab,已自手冊移除;lab 環境仍可用 <code>lab start boot-rescue</code> 練習)。<strong>但 recover root password 必考</strong>,見 boot-rootpw 題。</li>
 </ul>
 </section>
@@ -994,3 +980,4 @@ bash-5.2# exec /sbin/init      <span class="c"># 交還 systemd 繼續開機(rel
   });
 })();
 </script>
+
