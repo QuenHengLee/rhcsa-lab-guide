@@ -435,6 +435,15 @@ drwxrws--T. ... root accounting ...
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start nfs-autofs</pre>
 <p>serverb 匯出 <code>/rhome</code>;在 servera 用 autofs「間接對映」讓 <code>/rhome/remoteuser1</code> 進入時自動掛載,不可寫 fstab。<strong>serverb 必須開機。</strong></p></div>
+<div class="phase"><h4>② 概念:master 檔和對映檔怎麼分工</h4>
+<p>間接對映的路徑拆法只有一條規則:<strong>「除了最後一層,全部塞進 master;最後一層當 key,不加斜線」</strong>。最終掛載點 = master 的母目錄 + 對映檔的 key 拼起來。</p>
+<pre class="term"><span class="c"># master 檔:母目錄(完整路徑) → 用哪個對映檔</span>
+/rhome          /etc/auto.rhome
+<span class="c"># 對映檔:key(最後一層子目錄名,開頭「不加斜線」) 選項 遠端來源</span>
+remoteuser1     -rw     serverb.lab.example.com:/rhome/remoteuser1
+<span class="c"># 拼起來:/rhome + remoteuser1 = /rhome/remoteuser1 ✓</span></pre>
+<p>若題目給更深的掛載點(如 <code>/rhome/room1/remoteuser1</code>),母目錄可以是多層路徑——master 寫 <code>/rhome/room1</code>,key 仍只寫 <code>remoteuser1</code>。key <strong>永遠只有一層、永遠不帶斜線</strong>;帶斜線的完整路徑 key 是 direct map 的寫法(不考),在間接對映裡寫了就是錯。</p>
+<p class="note">冒號後面的遠端路徑照題目給的 export 路徑抄,別因為它常和本地掛載點長一樣就以為要照抄本地路徑——兩者只是常常剛好相同。</p></div>
 <div class="phase"><h4>② 逐步解法</h4>
 <pre class="term"><span class="p">#</span> dnf -y install autofs nfs-utils
 <span class="p">#</span> echo '/rhome /etc/auto.rhome' &gt; /etc/auto.master.d/rhome.autofs
