@@ -275,6 +275,26 @@ pre.term:hover .copybtn,.copybtn:focus-visible{opacity:1}
 <div class="phase"><h4>① 啟動</h4>
 <pre class="term"><span class="p">$</span> lab start perms-acl</pre>
 <p>複製 <code>/etc/fstab</code> 到 <code>/var/tmp/fstab</code>(root 擁有),ACL 設定:natasha 可讀寫、harry 完全不可、其他人唯讀。</p></div>
+<div class="phase"><h4>② 概念:ACL 是什麼、為什麼需要它</h4>
+<p>傳統權限一個檔案只能寫「一個擁有者、一個群組、其他人」三格(ugo)。當題目要求「<strong>natasha 可讀寫、harry 不可、其他人唯讀</strong>」——三個不同對象三種待遇,ugo 塞不下,就要用 ACL(Access Control List)幫<strong>個別使用者/群組</strong>各開一條規則。</p>
+<pre class="term"><span class="c"># 語法就一組:setfacl 設、getfacl 看</span>
+setfacl -m u:natasha:rw- 檔案    <span class="c"># -m=modify;u:使用者:權限</span>
+setfacl -m g:devteam:r-- 檔案    <span class="c"># g:群組:權限</span>
+setfacl -m o::r-- 檔案           <span class="c"># o::權限 = 改「其他人」(兩個冒號,中間留空)</span>
+setfacl -x u:natasha 檔案        <span class="c"># -x = 移除某條規則</span>
+setfacl -b 檔案                  <span class="c"># -b = 清掉所有 ACL,回到純 ugo</span></pre>
+<p>權限那格用 <code>rwx</code> 三字元寫(不給的位置補 <code>-</code>,如 <code>rw-</code>、<code>---</code>、<code>r--</code>);多條規則可用逗號一次設完。怎麼判斷檔案「有沒有」ACL:<code>ls -l</code> 權限欄結尾多一個 <code>+</code> 號(如 <code>-rw-rw-r--+</code>)就是有,再用 <code>getfacl</code> 看細節:</p>
+<pre class="term"><span class="p">#</span> getfacl /var/tmp/fstab
+# owner: root
+# group: root
+user::rw-              <span class="c"># 擁有者本人(ugo 的 u)</span>
+user:natasha:rw-       <span class="c"># ← ACL 加的:natasha 可讀寫</span>
+user:harry:---         <span class="c"># ← ACL 加的:harry 全擋</span>
+group::r--             <span class="c"># 擁有群組</span>
+mask::rw-              <span class="c"># 天花板(見下)</span>
+other::r--             <span class="c"># 其他人</span></pre>
+<p class="note"><strong>mask 是唯一的陷阱</strong>:它是「所有 ACL 條目 + 擁有群組」的權限<strong>天花板</strong>,實際權限 = 你設的值 ∩ mask。好消息是 <code>setfacl -m</code> 每次都會自動把 mask 重算到剛好夠用,所以照本題步驟做不會踩到;會出事的是事後手動 <code>chmod</code> 群組權限——那其實是在改 mask,可能悄悄把 natasha 的 rw 壓成唯讀。改過 chmod 後用 getfacl 檢查一下,看到 <code>#effective:r--</code> 字樣就是被 mask 壓住了。</p>
+<p>目錄還有「<strong>預設 ACL</strong>」:<code>setfacl -m d:u:natasha:rwx 目錄</code>(規則前加 <code>d:</code>),讓「之後在該目錄新建的檔案」自動繼承這條規則——題目出現「以後建立的檔案也要…」字眼就是考這個;本題只考檔案本身,用不到 d:。</p></div>
 <div class="phase"><h4>② 逐步解法</h4>
 <pre class="term"><span class="p">#</span> cp /etc/fstab /var/tmp/fstab
 <span class="p">#</span> setfacl -m u:natasha:rw-,u:harry:---,o::r-- /var/tmp/fstab</pre>
